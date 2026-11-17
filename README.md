@@ -20,6 +20,7 @@ This repository contains the Android foundation and P02's product UX specificati
 - [Annotated screen specifications](docs/ux/screen-specifications.md)
 - [Screen concept board](docs/ux/assets/p02-screen-board.svg)
 - [P02 completion and acceptance record](docs/ux/phase-2-completion.md)
+- [P03 Compose component foundation and gate status](docs/ux/phase-3-component-foundation.md)
 
 ## Toolchain
 

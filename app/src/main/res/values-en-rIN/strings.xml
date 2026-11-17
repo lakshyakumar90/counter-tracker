@@ -9,4 +9,9 @@
     <string name="sample_data_title">Developer sample data</string>
     <string name="sample_activity_run">Sample run · %1$.1f km · %2$d min</string>
     <string name="sample_activity_cycle">Sample ride · %1$.1f km · %2$d min</string>
+    <string name="pace_workout_timer_accessibility">%1$s, %2$s, %3$s remaining</string>
+    <string name="pace_interval_inactive">Inactive</string>
+    <string name="pace_calendar_scheduled">Scheduled</string>
+    <string name="pace_calendar_completed">Completed</string>
+    <string name="pace_calendar_missed">Missed</string>
 </resources>
