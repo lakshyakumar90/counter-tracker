@@ -6,6 +6,8 @@
 - Keep pull requests and changes focused on one roadmap task or one prerequisite at a time. Update the roadmap only when scope or sequencing actually changes.
 - Do not build a later phase on an unresolved gate. Record blockers and decisions in the relevant project documentation instead of silently choosing.
 - Before changing a platform or product decision, check the plan and its decision register. Decisions marked Proposed are not approved.
+- Treat `docs/product/` as the readable P00 product baseline. If it conflicts with the HTML build control center, flag and reconcile the mismatch before implementing affected behavior.
+- P00 defaults marked provisional (capacity, MVP cut line, and launch regions) need review at their stated checkpoints; do not turn them into permanent commitments without review.
 
 ## Product constraints
 

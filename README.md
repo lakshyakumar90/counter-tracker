@@ -4,6 +4,10 @@ Pace is a planned offline-first Android fitness app for cycling, running, joggin
 
 The starter app is Kotlin + Jetpack Compose. The intended architecture keeps activity data on-device first (Room); Supabase backup and optional AI are later capabilities. GPS and fitness data are private by default.
 
+## Product definition
+
+Phase P00 scope, user journeys, terminology, offline and restore contracts, acceptance criteria, privacy baseline, risks, and phase-gate checklist are documented in [`docs/product/`](docs/product/). The P00 task-to-evidence mapping is in [`docs/product/phase-0-completion.md`](docs/product/phase-0-completion.md). Defaults that need product-owner confirmation are called out in those documents.
+
 ## Current status
 
 This repository contains the initial Android project foundation. It is not yet a workout recorder. Follow the roadmap one step at a time and respect each phase gate. Product scope decisions are recorded in the HTML plan; items marked Proposed remain unapproved.
