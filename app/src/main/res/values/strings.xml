@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Pace</string>
+    <string name="welcome_title">Your pace, your progress</string>
+    <string name="welcome_body">A private fitness companion designed to work offline.</string>
+</resources>
