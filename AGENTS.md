@@ -20,5 +20,7 @@
 
 - Keep UI strings in Android resources and dependencies in the Gradle version catalog.
 - Add or update focused tests with behavior changes. Run the relevant unit tests, lint, and formatting checks before calling a task complete when the toolchain is available.
+- Prefer code-only checks (`compile`, unit tests, lint, and formatting) during implementation. Do not run `assembleDebug`, `assembleRelease`, `bundleRelease`, or other APK/AAB packaging tasks unless the user explicitly asks for a build. Batch relevant checks after a coherent change instead of rebuilding after every small edit.
+- Do not install or create Android emulators or system images. Use a connected physical Android device only when device testing is needed and one is available.
 - Preserve accessibility, lifecycle safety, and screen-off recording requirements when their phases are reached.
 - Document setup changes and decisions in `README.md` or a short architecture decision record.

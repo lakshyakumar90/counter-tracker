@@ -1,0 +1,10 @@
+<resources>
+    <style name="Theme.Pace" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">@color/pace_river</item>
+        <item name="android:windowBackground">@color/pace_canvas</item>
+        <item name="android:windowSplashScreenBackground">@color/pace_canvas</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_pace_mark</item>
+        <item name="android:windowSplashScreenAnimationDuration">0</item>
+    </style>
+</resources>

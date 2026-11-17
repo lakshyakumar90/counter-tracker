@@ -10,7 +10,7 @@ Phase P00 scope, user journeys, terminology, offline and restore contracts, acce
 
 ## Current status
 
-This repository contains the Android foundation and P02's product UX specification and Compose visual system. It is not yet a workout recorder. Follow the roadmap one step at a time and respect each phase gate. Product scope decisions are recorded in the HTML plan; items marked Proposed remain unapproved.
+This repository contains the Android foundation, P02 UX specification, P03 Compose component library, and P04 local-first shell/onboarding. Recording, activity persistence, maps, and analytics are not implemented yet. Follow the roadmap one step at a time and respect each phase gate. Product scope decisions are recorded in the HTML plan; items marked Proposed remain unapproved.
 
 ## Product UX and visual system
 
@@ -21,6 +21,7 @@ This repository contains the Android foundation and P02's product UX specificati
 - [Screen concept board](docs/ux/assets/p02-screen-board.svg)
 - [P02 completion and acceptance record](docs/ux/phase-2-completion.md)
 - [P03 Compose component foundation and gate status](docs/ux/phase-3-component-foundation.md)
+- [P04 shell and onboarding implementation record](docs/product/phase-4-completion.md)
 
 ## Toolchain
 

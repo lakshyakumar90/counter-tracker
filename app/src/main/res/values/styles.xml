@@ -1,6 +1,7 @@
 <resources>
     <style name="Theme.Pace" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:fontFamily">sans</item>
-        <item name="android:colorAccent">#0B7A75</item>
+        <item name="android:colorAccent">@color/pace_river</item>
+        <item name="android:windowBackground">@color/pace_canvas</item>
     </style>
 </resources>
