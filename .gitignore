@@ -11,6 +11,9 @@ out/
 # Signing material and local secrets
 *.jks
 *.keystore
+*.p12
+*.pfx
+*.key
 secrets.properties
 .env
 .env.*

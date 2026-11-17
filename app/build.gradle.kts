@@ -4,6 +4,21 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+val releaseSigningVariables = listOf(
+    "PACE_RELEASE_STORE_FILE",
+    "PACE_RELEASE_STORE_PASSWORD",
+    "PACE_RELEASE_KEY_ALIAS",
+    "PACE_RELEASE_KEY_PASSWORD",
+).associateWith(System::getenv)
+val hasAnyReleaseSigningVariable = releaseSigningVariables.values.any { !it.isNullOrBlank() }
+val hasCompleteReleaseSigningConfiguration = releaseSigningVariables.values.all { !it.isNullOrBlank() }
+
+if (hasAnyReleaseSigningVariable && !hasCompleteReleaseSigningConfiguration) {
+    throw GradleException(
+        "Release signing is partially configured. Set all four PACE_RELEASE_* variables or clear them all."
+    )
+}
+
 android {
     namespace = "com.pace.app"
     compileSdk = 36
@@ -14,14 +29,31 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    if (hasCompleteReleaseSigningConfiguration) {
+        signingConfigs {
+            create("release") {
+                storeFile = file(releaseSigningVariables.getValue("PACE_RELEASE_STORE_FILE")!!)
+                storePassword = releaseSigningVariables.getValue("PACE_RELEASE_STORE_PASSWORD")
+                keyAlias = releaseSigningVariables.getValue("PACE_RELEASE_KEY_ALIAS")
+                keyPassword = releaseSigningVariables.getValue("PACE_RELEASE_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
+            buildConfigField("boolean", "SAMPLE_DATA_ENABLED", "true")
         }
         release {
+            buildConfigField("boolean", "SAMPLE_DATA_ENABLED", "false")
+            if (hasCompleteReleaseSigningConfiguration) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
@@ -34,6 +66,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -52,4 +85,10 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     debugImplementation(libs.androidx.compose.ui.tooling)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
+    testImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
 }

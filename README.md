@@ -30,6 +30,9 @@ On Windows:
 ```powershell
 .\gradlew.bat :app:assembleDebug
 .\gradlew.bat :app:lintDebug
+.\gradlew.bat :app:testDebugUnitTest
+.\gradlew.bat :app:connectedDebugAndroidTest
+.\gradlew.bat checkFormatting
 .\gradlew.bat :app:installDebug
 ```
 
@@ -38,10 +41,31 @@ On macOS/Linux:
 ```sh
 ./gradlew :app:assembleDebug
 ./gradlew :app:lintDebug
+./gradlew :app:testDebugUnitTest
+./gradlew :app:connectedDebugAndroidTest
+./gradlew checkFormatting
 ./gradlew :app:installDebug
 ```
 
-Open the project directory in Android Studio to use an emulator. The initial screen is a simple Compose welcome screen; no network connection is needed to launch it.
+The initial screen is a simple Compose welcome screen; no network connection is needed to launch it. For device testing, connect an Android phone with USB debugging enabled and run `.\gradlew.bat :app:installDebug` (Windows) or `./gradlew :app:installDebug` (macOS/Linux). An emulator is not required. Instrumented UI tests also run on that connected phone with `:app:connectedDebugAndroidTest`.
+
+GitHub Actions runs the debug build, assembles the instrumented test APK, and runs JVM unit tests, lint, and formatting checks on pushes and pull requests. CI does not start an emulator; run the instrumented UI test on a connected physical phone when one is available.
+
+## Release signing
+
+Release APK/AAB builds use a private keystore supplied through environment variables. See [`docs/build-and-signing.md`](docs/build-and-signing.md). With no signing credentials configured, Gradle produces unsigned release artifacts.
+
+## Platform workflow
+
+- [Dependency update procedure](docs/platform/dependency-updates.md)
+- [Physical-device test routine](docs/platform/physical-device-testing.md)
+- [Android API policy and Android 16 review](docs/platform/android-api-policy.md)
+- [Localization baseline](docs/platform/localization.md)
+- [Secrets and source control](docs/platform/secrets-and-source-control.md)
+- [Play Console readiness](docs/platform/play-console-readiness.md)
+- [Core library choices ADR](docs/architecture/0001-core-libraries.md)
+- [P01 completion and owner-dependent follow-ups](docs/platform/phase-1-completion.md)
+- [Contributing and pull request conventions](CONTRIBUTING.md)
 
 ## Repository workflow
 
