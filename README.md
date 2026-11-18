@@ -10,7 +10,7 @@ Phase P00 scope, user journeys, terminology, offline and restore contracts, acce
 
 ## Current status
 
-This repository contains the Android foundation, P02 UX specification, P03 Compose component library, P04 local-first shell/onboarding, and P05 local data/repository layer. GPS recording, history UI, maps, and analytics are not implemented yet. Follow the roadmap one step at a time and respect each phase gate. Product scope decisions are recorded in the HTML plan; items marked Proposed remain unapproved.
+This repository contains the Android foundation, P02 UX specification, P03 Compose component library, P04 local-first shell/onboarding, P05 local data/repository layer, and P06 optional account/authentication foundation. GPS recording, history UI, maps, and analytics are not implemented yet. Follow the roadmap one step at a time and respect each phase gate. Product scope decisions are recorded in the HTML plan; items marked Proposed remain unapproved.
 
 ## Product UX and visual system
 
@@ -23,6 +23,8 @@ This repository contains the Android foundation, P02 UX specification, P03 Compo
 - [P03 Compose component foundation and gate status](docs/ux/phase-3-component-foundation.md)
 - [P04 shell and onboarding implementation record](docs/product/phase-4-completion.md)
 - [P05 local model and repository implementation record](docs/product/phase-5-completion.md)
+- [P06 account setup and gate status](docs/product/phase-6-completion.md)
+- [Supabase development setup](supabase/README.md)
 
 ## Toolchain
 

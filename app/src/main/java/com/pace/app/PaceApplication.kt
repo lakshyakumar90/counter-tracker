@@ -8,6 +8,9 @@ import com.pace.app.data.local.repository.RoomGoalRepository
 import com.pace.app.data.local.repository.RoomMapPackRepository
 import com.pace.app.data.local.repository.RoomSyncOperationRepository
 import com.pace.app.data.local.repository.RoomWorkoutRepository
+import com.pace.app.auth.LocalOnlyAuthRepository
+import com.pace.app.auth.PaceAuthRepository
+import com.pace.app.auth.SupabaseAuthRepository
 
 class PaceApplication : Application() {
     lateinit var container: PaceAppContainer
@@ -20,6 +23,13 @@ class PaceApplication : Application() {
 }
 
 class PaceAppContainer(context: Context) {
+    val authRepository: PaceAuthRepository by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        if (BuildConfig.SUPABASE_URL.isNotBlank() && BuildConfig.SUPABASE_PUBLISHABLE_KEY.isNotBlank()) {
+            SupabaseAuthRepository(context, BuildConfig.SUPABASE_URL, BuildConfig.SUPABASE_PUBLISHABLE_KEY)
+        } else {
+            LocalOnlyAuthRepository()
+        }
+    }
     val settingsRepository = PaceSettingsRepository(context)
     val database: PaceDatabase by lazy(LazyThreadSafetyMode.SYNCHRONIZED) { PaceDatabase.create(context) }
     val activityRepository by lazy(LazyThreadSafetyMode.SYNCHRONIZED) { RoomActivityRepository(database) }

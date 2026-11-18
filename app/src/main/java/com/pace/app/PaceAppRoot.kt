@@ -22,6 +22,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -43,6 +44,14 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.foundation.text.KeyboardOptions
+import com.pace.app.auth.AuthMessage
+import com.pace.app.auth.PaceAccountState
+import com.pace.app.auth.PaceAuthRepository
+import com.pace.app.auth.isValidNewPassword
+import com.pace.app.auth.normalizeEmail
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.graphics.Color
@@ -99,6 +108,7 @@ fun PaceAppRoot(
         } else if (currentPreferences.onboardingComplete) {
             PaceShell(
                 preferences = currentPreferences,
+                authRepository = container.authRepository,
                 onPreferencesChanged = updatePreferences,
                 forceHome = forceHome,
                 isOnline = online,
@@ -233,6 +243,7 @@ private fun OnboardingThemeChoices(draft: PacePreferences, onDraft: (PacePrefere
 @Composable
 private fun PaceShell(
     preferences: PacePreferences,
+    authRepository: PaceAuthRepository,
     onPreferencesChanged: (PacePreferences) -> Unit,
     forceHome: Boolean,
     isOnline: Boolean,
@@ -263,6 +274,7 @@ private fun PaceShell(
                         PaceDestinationContent(
                             route = if (profileOpen) PROFILE else tab,
                             preferences = preferences,
+                            authRepository = authRepository,
                             onPreferencesChanged = onPreferencesChanged,
                             onSelectTab = selectTab,
                             onOpenProfile = openProfile,
@@ -304,6 +316,7 @@ private fun PaceShell(
                         PaceDestinationContent(
                             route = if (profileOpen) PROFILE else tab,
                             preferences = preferences,
+                            authRepository = authRepository,
                             onPreferencesChanged = onPreferencesChanged,
                             onSelectTab = selectTab,
                             onOpenProfile = openProfile,
@@ -320,6 +333,7 @@ private fun PaceShell(
 private fun PaceDestinationContent(
     route: String,
     preferences: PacePreferences,
+    authRepository: PaceAuthRepository,
     onPreferencesChanged: (PacePreferences) -> Unit,
     onSelectTab: (String) -> Unit,
     onOpenProfile: () -> Unit,
@@ -330,7 +344,7 @@ private fun PaceDestinationContent(
         RECORD -> PaceRecordScreen(preferences, modifier)
         MAPS -> PaceMapsScreen(modifier)
         INSIGHTS -> PaceInsightsScreen(onSelectTab, modifier)
-        PROFILE -> PaceProfileScreen(preferences, onPreferencesChanged, modifier)
+        PROFILE -> PaceProfileScreen(preferences, authRepository, onPreferencesChanged, modifier)
         PLAN -> if (PLAN_DESTINATION_ENABLED) PacePlanScopeScreen(modifier) else PaceHomeScreen(preferences, onSelectTab, onOpenProfile, modifier)
         else -> PaceHomeScreen(preferences, onSelectTab, onOpenProfile, modifier)
     }
@@ -418,6 +432,7 @@ private fun PacePlanScopeScreen(modifier: Modifier = Modifier) {
 @Composable
 private fun PaceProfileScreen(
     preferences: PacePreferences,
+    authRepository: PaceAuthRepository,
     onPreferencesChanged: (PacePreferences) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -426,8 +441,7 @@ private fun PaceProfileScreen(
     val sports = sportOptions()
     Column(modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(stringResource(R.string.pace_profile_title), style = MaterialTheme.typography.headlineMedium, modifier = Modifier.semantics { heading() })
-        Text(stringResource(R.string.pace_profile_local_state), style = MaterialTheme.typography.titleMedium)
-        Text(stringResource(R.string.pace_profile_no_account), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        PaceAccountCard(authRepository)
         PaceTextField(
             value = name,
             onValueChange = { name = it.take(60); saved = false },
@@ -481,6 +495,154 @@ private fun PaceProfileScreen(
             }
         }
         DebugBuildInformation()
+    }
+}
+
+@Composable
+private fun PaceAccountCard(authRepository: PaceAuthRepository) {
+    val accountState by authRepository.accountState.collectAsState()
+    var email by rememberSaveable { mutableStateOf("") }
+    var password by rememberSaveable { mutableStateOf("") }
+    var createAccount by rememberSaveable { mutableStateOf(false) }
+    var forgotPassword by rememberSaveable { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf<AuthMessage?>(null) }
+    val scope = rememberCoroutineScope()
+    val emailValue = normalizeEmail(email)
+
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(stringResource(R.string.pace_account_title), style = MaterialTheme.typography.titleMedium)
+            if (!authRepository.isConfigured) {
+                Text(stringResource(R.string.pace_account_not_configured), style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.pace_account_local_mode), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                when (val state = accountState) {
+                    PaceAccountState.LocalOnly -> Text(stringResource(R.string.pace_account_local_mode), style = MaterialTheme.typography.bodyMedium)
+                    PaceAccountState.Loading -> Text(stringResource(R.string.pace_account_loading), style = MaterialTheme.typography.bodyMedium)
+                    is PaceAccountState.SignedIn -> {
+                        Text(
+                            if (state.email.isNullOrBlank()) stringResource(R.string.pace_account_signed_in_no_email)
+                            else stringResource(R.string.pace_account_signed_in, state.email),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Text(stringResource(R.string.pace_account_local_data_note), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        OutlinedTextField(
+                            value = password,
+                            onValueChange = { password = it.take(128); message = null },
+                            label = { Text(stringResource(R.string.pace_account_new_password)) },
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        PacePrimaryButton(
+                            label = stringResource(R.string.pace_account_update_password),
+                            onClick = {
+                                scope.launch {
+                                    busy = true
+                                    val result = if (isValidNewPassword(password)) authRepository.updatePassword(password)
+                                    else com.pace.app.auth.AuthActionResult(AuthMessage.InvalidInput, false)
+                                    message = result.message
+                                    password = ""
+                                    busy = false
+                                }
+                            },
+                            enabled = !busy && password.isNotEmpty(),
+                        )
+                        PaceTextAction(
+                            label = stringResource(R.string.pace_account_sign_out),
+                            onClick = {
+                                scope.launch {
+                                    busy = true
+                                    val result = authRepository.signOut()
+                                    message = result.message
+                                    busy = false
+                                }
+                            },
+                        )
+                    }
+                    PaceAccountState.SignedOut, PaceAccountState.NeedsReauthentication -> {
+                        if (state == PaceAccountState.NeedsReauthentication) {
+                            Text(stringResource(R.string.pace_account_reauthenticate), style = MaterialTheme.typography.bodyMedium)
+                        }
+                        if (!forgotPassword) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                FilterChip(
+                                    selected = !createAccount,
+                                    onClick = { createAccount = false; message = null },
+                                    label = { Text(stringResource(R.string.pace_account_sign_in)) },
+                                )
+                                FilterChip(
+                                    selected = createAccount,
+                                    onClick = { createAccount = true; message = null },
+                                    label = { Text(stringResource(R.string.pace_account_create)) },
+                                )
+                            }
+                        }
+                        OutlinedTextField(
+                            value = email,
+                            onValueChange = { email = it.take(254); message = null },
+                            label = { Text(stringResource(R.string.pace_account_email)) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        if (!forgotPassword) {
+                            OutlinedTextField(
+                                value = password,
+                                onValueChange = { password = it.take(128); message = null },
+                                label = { Text(stringResource(R.string.pace_account_password)) },
+                                visualTransformation = PasswordVisualTransformation(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                        PacePrimaryButton(
+                            label = stringResource(
+                                when {
+                                    forgotPassword -> R.string.pace_account_send_reset
+                                    createAccount -> R.string.pace_account_create
+                                    else -> R.string.pace_account_sign_in
+                                },
+                            ),
+                            onClick = {
+                                scope.launch {
+                                    busy = true
+                                    message = when {
+                                        emailValue == null -> AuthMessage.InvalidInput
+                                        forgotPassword -> authRepository.sendPasswordReset(emailValue).let { it.message }
+                                        !isValidNewPassword(password) -> AuthMessage.InvalidInput
+                                        createAccount -> authRepository.register(emailValue, password).let { it.message }
+                                        else -> authRepository.signIn(emailValue, password).let { it.message }
+                                    }
+                                    busy = false
+                                }
+                            },
+                            enabled = !busy && emailValue != null && (forgotPassword || password.isNotEmpty()),
+                        )
+                        PaceTextAction(
+                            label = stringResource(if (forgotPassword) R.string.pace_account_back_to_sign_in else R.string.pace_account_forgot_password),
+                            onClick = { forgotPassword = !forgotPassword; message = null },
+                        )
+                    }
+                }
+                message?.let { result ->
+                    val res = when (result) {
+                        AuthMessage.CheckEmail -> R.string.pace_account_check_email
+                        AuthMessage.ResetEmailSent -> R.string.pace_account_reset_sent
+                        AuthMessage.PasswordUpdated -> R.string.pace_account_password_updated
+                        AuthMessage.SignedOut -> R.string.pace_account_signed_out
+                        AuthMessage.SignedIn -> R.string.pace_account_signed_in_notice
+                        AuthMessage.InvalidInput -> R.string.pace_account_input_error
+                        AuthMessage.AccountUnavailable -> R.string.pace_account_service_error
+                        AuthMessage.NetworkOrServiceError -> R.string.pace_account_service_error
+                    }
+                    Text(stringResource(res), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
     }
 }
 

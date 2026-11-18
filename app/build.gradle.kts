@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
 }
 
@@ -17,6 +18,8 @@ val releaseSigningVariables = listOf(
 ).associateWith(System::getenv)
 val hasAnyReleaseSigningVariable = releaseSigningVariables.values.any { !it.isNullOrBlank() }
 val hasCompleteReleaseSigningConfiguration = releaseSigningVariables.values.all { !it.isNullOrBlank() }
+val supabaseUrl = providers.gradleProperty("PACE_SUPABASE_URL").orElse("").get()
+val supabasePublishableKey = providers.gradleProperty("PACE_SUPABASE_PUBLISHABLE_KEY").orElse("").get()
 
 if (hasAnyReleaseSigningVariable && !hasCompleteReleaseSigningConfiguration) {
     throw GradleException(
@@ -35,6 +38,8 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
+        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"$supabasePublishableKey\"")
     }
 
     if (hasCompleteReleaseSigningConfiguration) {
@@ -87,6 +92,9 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     implementation(libs.androidx.datastore.preferences)
+    implementation(platform(libs.supabase.bom))
+    implementation(libs.supabase.auth)
+    implementation(libs.ktor.client.android)
     ksp(libs.androidx.room.compiler)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)

@@ -85,6 +85,17 @@ new debug APK; that packaging requires the owner's explicit instruction per
 actual P05 velocity log is available, so this is not a validated forecast.
 Review the provisional MVP cut line and measured capacity before committing
 P07–P16 dates.
+
+## P06 checkpoint (2026-11-18)
+
+The owner explicitly directed implementation of P06 while P05's physical-device
+gate remained open. This is a recorded sequencing exception; P05's migration and
+instrumentation evidence remains pending. P06 now has an optional Supabase Auth
+client, encrypted session storage, email flows, and a profile/RLS migration.
+No Supabase project credentials were present, so online account and two-user RLS
+checks have not run. P06 remains Hold until its account flow and profile isolation
+are verified against a configured development project. See
+[P06 completion evidence](phase-6-completion.md).
 | P22 Operations/growth | Support, monitoring, retention, recovery and next-version scope ready. |
 
 ## Release channels
