@@ -359,7 +359,13 @@ private fun PaceDestinationContent(
 ) {
     when (route) {
         HOME -> PaceHomeScreen(preferences, onSelectTab, onOpenProfile, modifier)
-        RECORD -> PaceRecordScreen(preferences, modifier)
+        RECORD -> com.pace.app.ui.record.PaceRecordFlow(
+            preferences = preferences,
+            onPreferencesChanged = onPreferencesChanged,
+            onSelectTab = onSelectTab,
+            isOnline = isOnline,
+            modifier = modifier,
+        )
         MAPS -> PaceMapsScreen(preferences, isOnline, modifier)
         INSIGHTS -> PaceInsightsScreen(onSelectTab, modifier)
         PROFILE -> PaceProfileScreen(preferences, authRepository, onPreferencesChanged, modifier)
@@ -388,121 +394,6 @@ private fun PaceHomeScreen(
             onAction = { onSelectTab(RECORD) },
         )
         DebugDeveloperCard()
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun PaceRecordScreen(preferences: PacePreferences, modifier: Modifier = Modifier) {
-    var selectedSport by rememberSaveable { mutableStateOf(preferences.preferredSports.firstOrNull() ?: PaceSport.Running) }
-    val context = LocalContext.current
-    val app = context.applicationContext as PaceApplication
-    var active by remember { mutableStateOf<ActivityEntity?>(null) }
-    var horizontalAccuracy by remember { mutableStateOf<Float?>(null) }
-    var permissionDenied by remember { mutableStateOf(false) }
-    var confirmFinish by remember { mutableStateOf(false) }
-    val permissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
-        val allowed = results[Manifest.permission.ACCESS_FINE_LOCATION] == true || results[Manifest.permission.ACCESS_COARSE_LOCATION] == true ||
-            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
-            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        if (allowed) {
-            val id = UUID.randomUUID().toString()
-            val now = System.currentTimeMillis()
-            active = ActivityEntity(id = id, sport = selectedSport.name.uppercase(), status = "RECORDING", startedAtEpochMillis = now, createdAtEpochMillis = now, updatedAtEpochMillis = now)
-            RecordingService.start(context, selectedSport.name.uppercase(), id)
-            permissionDenied = false
-        } else permissionDenied = true
-    }
-    LaunchedEffect(Unit) {
-        active = withContext(Dispatchers.IO) { app.container.database.activityDao().getActiveRecording() }
-        while (true) {
-            delay(2_000)
-            val latest = withContext(Dispatchers.IO) {
-                val current = app.container.database.activityDao().getActiveRecording()
-                current to current?.let { app.container.database.trackPointDao().lastForActivity(it.id)?.horizontalAccuracyMeters }
-            }
-            active = latest.first
-            horizontalAccuracy = latest.second
-        }
-    }
-    val options = sportOptions()
-    Column(modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text(stringResource(R.string.pace_record_title), style = MaterialTheme.typography.headlineMedium, modifier = Modifier.semantics { heading() })
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            options.forEach { (sport, label) ->
-                PaceSportSelectorTile(sport = sport, label = label, selected = sport == selectedSport, onClick = { selectedSport = sport })
-            }
-        }
-        Text(stringResource(R.string.pace_record_selected_sport, options.first { it.first == selectedSport }.second), style = MaterialTheme.typography.titleMedium)
-        Card {
-            Text(
-                stringResource(R.string.pace_record_preflight_body),
-                Modifier.padding(16.dp),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        active?.let { session ->
-            val recovered = session.status == "RECOVERED" || (session.status == "RECORDING" && !RecordingService.isRunning)
-            Text(
-                stringResource(if (session.status == "PAUSED") R.string.pace_record_paused else if (recovered) R.string.pace_record_recovered else R.string.pace_record_tracking),
-                style = MaterialTheme.typography.titleMedium,
-            )
-            Text(
-                stringResource(R.string.pace_record_live_metrics, session.distanceMeters, session.elapsedSeconds),
-                style = MaterialTheme.typography.bodyLarge,
-            )
-            Text(
-                horizontalAccuracy?.let { stringResource(R.string.pace_record_accuracy, it) } ?: stringResource(R.string.pace_record_waiting_fix),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (session.status == "RECORDING" && recovered) {
-                Text(stringResource(R.string.pace_record_recovery_body), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                PacePrimaryButton(
-                    label = stringResource(R.string.pace_record_resume),
-                    onClick = { RecordingService.resume(context, session.id); active = session.copy(status = "RECORDING", dataQualityFlags = "INTERRUPTED") },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            } else if (session.status == "PAUSED") {
-                PacePrimaryButton(
-                    label = stringResource(R.string.pace_record_resume),
-                    onClick = { RecordingService.resume(context, session.id); active = session.copy(status = "RECORDING") },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            } else {
-                PacePrimaryButton(
-                    label = stringResource(R.string.pace_record_pause),
-                    onClick = { RecordingService.control(context, RecordingService.ACTION_PAUSE, session.id); active = session.copy(status = "PAUSED") },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-            PaceTextAction(label = stringResource(R.string.pace_record_finish), onClick = { confirmFinish = true }, modifier = Modifier.fillMaxWidth())
-        } ?: run {
-            PacePrimaryButton(
-                label = stringResource(R.string.pace_record_start),
-                onClick = {
-                    val requested = mutableListOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION)
-                    if (android.os.Build.VERSION.SDK_INT >= 33) requested += Manifest.permission.POST_NOTIFICATIONS
-                    permissions.launch(requested.toTypedArray())
-                },
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-        if (permissionDenied) Text(stringResource(R.string.pace_record_permission_denied), color = MaterialTheme.colorScheme.error)
-        if (confirmFinish) AlertDialog(
-            onDismissRequest = { confirmFinish = false },
-            title = { Text(stringResource(R.string.pace_record_finish_title)) },
-            text = { Text(stringResource(R.string.pace_record_finish_body)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmFinish = false
-                    active?.let { RecordingService.control(context, RecordingService.ACTION_FINISH, it.id) }
-                    active = null
-                }) { Text(stringResource(R.string.pace_record_finish)) }
-            },
-            dismissButton = { TextButton(onClick = { confirmFinish = false }) { Text(stringResource(R.string.pace_cancel)) } },
-        )
     }
 }
 

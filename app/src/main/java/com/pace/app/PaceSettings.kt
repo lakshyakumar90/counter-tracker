@@ -31,6 +31,7 @@ internal object PacePreferenceKeys {
     val theme = stringPreferencesKey("theme_choice")
     val profileName = stringPreferencesKey("profile_name")
     val lastSelectedTab = stringPreferencesKey("last_selected_tab")
+    val lastUsedSport = stringPreferencesKey("last_used_sport")
 }
 
 data class PacePreferences(
@@ -40,6 +41,7 @@ data class PacePreferences(
     val theme: PaceThemeChoice = PaceThemeChoice.System,
     val profileName: String = "",
     val lastSelectedTab: String = "home",
+    val lastUsedSport: PaceSport = PaceSport.Running,
 )
 
 internal fun decodePacePreferences(stored: Preferences): PacePreferences = try {
@@ -58,6 +60,9 @@ internal fun decodePacePreferences(stored: Preferences): PacePreferences = try {
         lastSelectedTab = stored[PacePreferenceKeys.lastSelectedTab]
             ?.takeIf { it in setOf("home", "record", "maps", "insights") }
             ?: defaults.lastSelectedTab,
+        lastUsedSport = stored[PacePreferenceKeys.lastUsedSport]
+            ?.let { runCatching { PaceSport.valueOf(it) }.getOrNull() }
+            ?: defaults.lastUsedSport,
     )
 } catch (_: ClassCastException) {
     PacePreferences()
@@ -91,6 +96,7 @@ class PaceSettingsRepository internal constructor(
             stored[PacePreferenceKeys.theme] = value.theme.name
             stored[PacePreferenceKeys.profileName] = value.profileName
             stored[PacePreferenceKeys.lastSelectedTab] = value.lastSelectedTab.takeIf { it in VALID_TABS } ?: "home"
+            stored[PacePreferenceKeys.lastUsedSport] = value.lastUsedSport.name
         }
     }
 

@@ -43,11 +43,20 @@ interface ActivityDao {
     @Query("SELECT * FROM activities WHERE id = :id AND deleted_at_epoch_millis IS NULL")
     suspend fun getById(id: String): ActivityEntity?
 
+    @Query("SELECT * FROM activities WHERE id = :id AND deleted_at_epoch_millis IS NULL")
+    fun observeById(id: String): Flow<ActivityEntity?>
+
     @Query("SELECT * FROM activities WHERE id = :id")
     suspend fun getIncludingDeleted(id: String): ActivityEntity?
 
     @Query("SELECT * FROM activities WHERE status IN ('RECORDING', 'PAUSED', 'RECOVERED') AND deleted_at_epoch_millis IS NULL ORDER BY started_at_epoch_millis DESC LIMIT 1")
     suspend fun getActiveRecording(): ActivityEntity?
+
+    @Query("SELECT * FROM activities WHERE status IN ('RECORDING', 'PAUSED', 'RECOVERED', 'FINISHING') AND deleted_at_epoch_millis IS NULL ORDER BY started_at_epoch_millis DESC LIMIT 1")
+    fun observeActiveRecording(): Flow<ActivityEntity?>
+
+    @Query("DELETE FROM activities WHERE id = :id AND status != 'SAVED'")
+    suspend fun discardInProgress(id: String): Int
 
     @Transaction
     @Query("SELECT * FROM activities WHERE id = :id AND deleted_at_epoch_millis IS NULL")
@@ -107,6 +116,9 @@ interface TrackPointDao {
     @Query("SELECT * FROM track_points WHERE activity_id = :activityId ORDER BY sequence ASC")
     suspend fun forActivity(activityId: String): List<TrackPointEntity>
 
+    @Query("SELECT * FROM track_points WHERE activity_id = :activityId ORDER BY sequence ASC")
+    fun observeForActivity(activityId: String): Flow<List<TrackPointEntity>>
+
     @Query("DELETE FROM track_points WHERE activity_id = :activityId")
     suspend fun deleteForActivity(activityId: String)
 
@@ -124,6 +136,9 @@ interface SplitDao {
 
     @Query("SELECT * FROM splits WHERE activity_id = :activityId ORDER BY split_number ASC")
     suspend fun forActivity(activityId: String): List<SplitEntity>
+
+    @Query("SELECT * FROM splits WHERE activity_id = :activityId ORDER BY split_number ASC")
+    fun observeForActivity(activityId: String): Flow<List<SplitEntity>>
 
     @Query("DELETE FROM splits WHERE activity_id = :activityId")
     suspend fun deleteForActivity(activityId: String)

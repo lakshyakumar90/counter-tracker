@@ -33,30 +33,62 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.pace.app.data.local.entity.TrackPointEntity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.pace.app.R
 import kotlinx.coroutines.delay
 import org.maplibre.android.MapLibre
+import org.maplibre.android.camera.CameraUpdateFactory
+import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.geometry.LatLngBounds
+import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
+import org.maplibre.android.maps.Style
+import org.maplibre.android.style.layers.CircleLayer
+import org.maplibre.android.style.layers.FillLayer
+import org.maplibre.android.style.layers.LineLayer
+import org.maplibre.android.style.layers.PropertyFactory
+import org.maplibre.android.style.sources.GeoJsonSource
+import org.maplibre.geojson.Feature
+import org.maplibre.geojson.FeatureCollection
+import org.maplibre.geojson.LineString
+import org.maplibre.geojson.Point
+import org.maplibre.geojson.Polygon
 
 private const val OPENFREEMAP_LIBERTY_STYLE = "https://tiles.openfreemap.org/styles/liberty"
 private const val OPENFREEMAP_DARK_STYLE = "https://tiles.openfreemap.org/styles/dark"
 private const val MAP_LOAD_TIMEOUT_MILLIS = 12_000L
+private const val ROUTE_SOURCE_ID = "pace-recorded-route-source"
+private const val ROUTE_LAYER_ID = "pace-recorded-route-layer"
+private const val POSITION_SOURCE_ID = "pace-recorded-position-source"
+private const val ACCURACY_LAYER_ID = "pace-recorded-accuracy-layer"
+private const val POSITION_LAYER_ID = "pace-recorded-position-layer"
 
 /**
  * Online MapLibre view with an honest local fallback. This view never requests location;
  * recording and GPS collection remain owned by the recording flow/service.
  */
 @Composable
-fun PaceMapPanel(darkTheme: Boolean, isOnline: Boolean, modifier: Modifier = Modifier) {
+fun PaceMapPanel(
+    darkTheme: Boolean,
+    isOnline: Boolean,
+    routePoints: List<TrackPointEntity> = emptyList(),
+    followLocation: Boolean = false,
+    fitRoute: Boolean = false,
+    recenterKey: Int = 0,
+    modifier: Modifier = Modifier,
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var styleLoaded by remember { mutableStateOf(false) }
     var loadTimedOut by remember { mutableStateOf(false) }
     var loadAttempt by remember { mutableIntStateOf(0) }
     var requestGeneration by remember { mutableIntStateOf(0) }
+    var lastRecenterKey by remember { mutableIntStateOf(recenterKey) }
+    var mapRef by remember { mutableStateOf<MapLibreMap?>(null) }
+    var loadedStyle by remember { mutableStateOf<Style?>(null) }
     val mapView = remember(context) {
         MapLibre.getInstance(context)
         MapView(context).apply {
@@ -102,16 +134,80 @@ fun PaceMapPanel(darkTheme: Boolean, isOnline: Boolean, modifier: Modifier = Mod
         val activeGeneration = requestGeneration + 1
         requestGeneration = activeGeneration
         styleLoaded = false
+        loadedStyle = null
         loadTimedOut = !isOnline
         if (!isOnline) return@LaunchedEffect
         mapView.getMapAsync { map ->
+            mapRef = map
             val styleUrl = if (darkTheme) OPENFREEMAP_DARK_STYLE else OPENFREEMAP_LIBERTY_STYLE
-            map.setStyle(styleUrl) {
-                if (requestGeneration == activeGeneration && loadAttempt == activeAttempt) styleLoaded = true
+            map.setStyle(styleUrl) { style ->
+                if (requestGeneration == activeGeneration && loadAttempt == activeAttempt) {
+                    loadedStyle = style
+                    styleLoaded = true
+                }
             }
         }
         delay(MAP_LOAD_TIMEOUT_MILLIS)
         if (!styleLoaded && requestGeneration == activeGeneration && loadAttempt == activeAttempt) loadTimedOut = true
+    }
+
+    LaunchedEffect(loadedStyle, routePoints, followLocation, fitRoute, recenterKey, darkTheme) {
+        val style = loadedStyle ?: return@LaunchedEffect
+        val map = mapRef ?: return@LaunchedEffect
+        val recenterRequested = recenterKey != lastRecenterKey
+        lastRecenterKey = recenterKey
+        val lines = routePoints.groupBy { it.segmentIndex }.toSortedMap().values.mapNotNull { segment ->
+            segment.map { Point.fromLngLat(it.longitude, it.latitude) }
+                .takeIf { it.size >= 2 }
+                ?.let { LineString.fromLngLats(it) }
+        }
+        val routeSource = style.getSourceAs<GeoJsonSource>(ROUTE_SOURCE_ID) ?: GeoJsonSource(ROUTE_SOURCE_ID).also { source ->
+            style.addSource(source)
+            style.addLayer(LineLayer(ROUTE_LAYER_ID, ROUTE_SOURCE_ID).withProperties(
+                PropertyFactory.lineColor(if (darkTheme) "#58D8CF" else "#087F78"),
+                PropertyFactory.lineWidth(5f),
+                PropertyFactory.lineOpacity(.92f),
+                PropertyFactory.lineCap("round"),
+                PropertyFactory.lineJoin("round"),
+            ))
+        }
+        routeSource.setGeoJson(FeatureCollection.fromFeatures(lines.map(Feature::fromGeometry)))
+
+        val positionSource = style.getSourceAs<GeoJsonSource>(POSITION_SOURCE_ID) ?: GeoJsonSource(POSITION_SOURCE_ID).also { source ->
+            style.addSource(source)
+            style.addLayer(FillLayer(ACCURACY_LAYER_ID, POSITION_SOURCE_ID).withProperties(
+                PropertyFactory.fillColor(if (darkTheme) "#58D8CF" else "#087F78"),
+                PropertyFactory.fillOpacity(.16f),
+            ))
+            style.addLayer(CircleLayer(POSITION_LAYER_ID, POSITION_SOURCE_ID).withProperties(
+                PropertyFactory.circleRadius(7f),
+                PropertyFactory.circleColor(if (darkTheme) "#58D8CF" else "#087F78"),
+                PropertyFactory.circleStrokeColor(if (darkTheme) "#10211F" else "#FFFFFF"),
+                PropertyFactory.circleStrokeWidth(2f),
+            ))
+        }
+        val last = routePoints.lastOrNull()
+        if (last == null) {
+            positionSource.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+            return@LaunchedEffect
+        }
+        val features = buildList {
+            add(Feature.fromGeometry(Point.fromLngLat(last.longitude, last.latitude)))
+            last.horizontalAccuracyMeters?.toDouble()?.takeIf { it > 0.0 }?.let { radius ->
+                add(Feature.fromGeometry(accuracyPolygon(last.latitude, last.longitude, radius)))
+            }
+        }
+        positionSource.setGeoJson(FeatureCollection.fromFeatures(features))
+        if (followLocation || recenterRequested) {
+            map.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(last.latitude, last.longitude), 16.0))
+        } else if (fitRoute && routePoints.size >= 2) {
+            val bounds = LatLngBounds.Builder().apply {
+                routePoints.forEach { include(LatLng(it.latitude, it.longitude)) }
+            }.build()
+            map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 48))
+        } else if (routePoints.size == 1) {
+            map.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(last.latitude, last.longitude), 15.0))
+        }
     }
 
     Surface(
@@ -121,7 +217,7 @@ fun PaceMapPanel(darkTheme: Boolean, isOnline: Boolean, modifier: Modifier = Mod
         tonalElevation = 1.dp,
     ) {
         Box(Modifier.fillMaxSize()) {
-            if (!styleLoaded) OfflineMapPlaceholder(darkTheme, Modifier.fillMaxSize())
+            if (!styleLoaded) OfflineMapPlaceholder(darkTheme, routePoints, Modifier.fillMaxSize())
             AndroidView(
                 factory = { mapView },
                 modifier = Modifier.fillMaxSize(),
@@ -141,7 +237,11 @@ fun PaceMapPanel(darkTheme: Boolean, isOnline: Boolean, modifier: Modifier = Mod
 
 /** A packaged, non-geographic illustration so the map surface is never an empty tile rectangle. */
 @Composable
-private fun OfflineMapPlaceholder(darkTheme: Boolean, modifier: Modifier = Modifier) {
+private fun OfflineMapPlaceholder(
+    darkTheme: Boolean,
+    routePoints: List<TrackPointEntity>,
+    modifier: Modifier = Modifier,
+) {
     val background = if (darkTheme) Color(0xFF172329) else Color(0xFFEAF0ED)
     val road = if (darkTheme) Color(0xFF34434A) else Color.White
     val secondaryRoad = if (darkTheme) Color(0xFF26363D) else Color(0xFFD4DEDA)
@@ -174,7 +274,60 @@ private fun OfflineMapPlaceholder(darkTheme: Boolean, modifier: Modifier = Modif
         localStreets.forEach { (start, end) ->
             drawLine(secondaryRoad, start, end, strokeWidth = size.width * .012f, cap = StrokeCap.Round)
         }
+        if (routePoints.isNotEmpty()) {
+            val minLatitude = routePoints.minOf { it.latitude }
+            val maxLatitude = routePoints.maxOf { it.latitude }
+            val minLongitude = routePoints.minOf { it.longitude }
+            val maxLongitude = routePoints.maxOf { it.longitude }
+            val latitudeSpan = (maxLatitude - minLatitude).coerceAtLeast(0.00001)
+            val longitudeSpan = (maxLongitude - minLongitude).coerceAtLeast(0.00001)
+            val padding = size.minDimension * .16f
+            val scale = minOf(
+                (size.width - 2 * padding) / longitudeSpan.toFloat(),
+                (size.height - 2 * padding) / latitudeSpan.toFloat(),
+            )
+            val routeColor = if (darkTheme) Color(0xFF58D8CF) else Color(0xFF087F78)
+            val projected = routePoints.groupBy { it.segmentIndex }.toSortedMap().values
+            projected.forEach { segment ->
+                if (segment.size < 2) return@forEach
+                val path = Path()
+                segment.forEachIndexed { index, point ->
+                    val x = padding + (point.longitude - minLongitude).toFloat() * scale
+                    val y = size.height - padding - (point.latitude - minLatitude).toFloat() * scale
+                    if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                }
+                drawPath(path, routeColor, style = Stroke(width = size.minDimension * .018f, cap = StrokeCap.Round))
+            }
+            val last = routePoints.last()
+            val x = padding + (last.longitude - minLongitude).toFloat() * scale
+            val y = size.height - padding - (last.latitude - minLatitude).toFloat() * scale
+            last.horizontalAccuracyMeters?.let { accuracy ->
+                val radius = (accuracy / 111_320f * scale).coerceIn(size.minDimension * .018f, size.minDimension * .3f)
+                drawCircle(routeColor.copy(alpha = .14f), radius = radius, center = Offset(x, y))
+            }
+            drawCircle(routeColor, radius = size.minDimension * .022f, center = Offset(x, y))
+            drawCircle(Color.White, radius = size.minDimension * .013f, center = Offset(x, y))
+        }
     }
+}
+
+private fun accuracyPolygon(latitude: Double, longitude: Double, radiusMeters: Double): Polygon {
+    val latitudeRadians = Math.toRadians(latitude)
+    val longitudeRadians = Math.toRadians(longitude)
+    val angularDistance = radiusMeters / 6_371_008.8
+    val coordinates = (0..48).map { step ->
+        val bearing = step * (2.0 * Math.PI / 48.0)
+        val pointLatitude = kotlin.math.asin(
+            kotlin.math.sin(latitudeRadians) * kotlin.math.cos(angularDistance) +
+                kotlin.math.cos(latitudeRadians) * kotlin.math.sin(angularDistance) * kotlin.math.cos(bearing),
+        )
+        val pointLongitude = longitudeRadians + kotlin.math.atan2(
+            kotlin.math.sin(bearing) * kotlin.math.sin(angularDistance) * kotlin.math.cos(latitudeRadians),
+            kotlin.math.cos(angularDistance) - kotlin.math.sin(latitudeRadians) * kotlin.math.sin(pointLatitude),
+        )
+        Point.fromLngLat(Math.toDegrees(pointLongitude), Math.toDegrees(pointLatitude))
+    }
+    return Polygon.fromLngLats(listOf(coordinates))
 }
 
 @Composable
