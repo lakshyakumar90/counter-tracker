@@ -11,9 +11,9 @@
   excluded from default navigation under the P00 V1.1 cut line.
 - A local-only first-run flow with skip, preferred activities, metric/imperial
   preference, system/light/dark theme, and optional profile name.
-- Settings persisted locally in a small SharedPreferences repository. This is
-  app configuration only; P05 remains responsible for Room-backed activity
-  data and repository contracts.
+- Settings were initially persisted locally in SharedPreferences. P05 migrates
+  these preferences once into DataStore and adds Room for fitness data; these
+  are independent of cloud account state.
 - Last selected tab persists across process/activity recreation. Back from
   profile/settings returns to the prior tab. No external deep-link filters or
   privileged deep-link routes are registered; unexpected data/action intents

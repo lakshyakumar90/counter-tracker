@@ -73,6 +73,18 @@ A phase is **Go** only when its named gate is evidenced, relevant P0 dependencie
 | P19 Reliability/security | Release reliability, performance, security and accessibility matrix passes. |
 | P20 Beta/deployment | Signed installable beta, offline reliability evidence, current store requirements and disclosures complete. |
 | P21 Optional intelligence | Opt-in validated AI; no offline-core regression; privacy/cost controls approved. |
+
+## P05 checkpoint (2026-11-18)
+
+The local Room/DataStore source and migration test source are implemented. Main
+and Android-test code compilation has passed. The physical-device migration and
+repository instrumentation suite has not run because it requires packaging a
+new debug APK; that packaging requires the owner's explicit instruction per
+`AGENTS.md`. See [P05 completion evidence](phase-5-completion.md). The roadmap's
+78-point P05 estimate is 19.5 weeks at the provisional 4-point weekly rate; no
+actual P05 velocity log is available, so this is not a validated forecast.
+Review the provisional MVP cut line and measured capacity before committing
+P07–P16 dates.
 | P22 Operations/growth | Support, monitoring, retention, recovery and next-version scope ready. |
 
 ## Release channels

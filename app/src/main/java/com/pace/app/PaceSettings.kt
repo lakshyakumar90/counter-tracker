@@ -1,11 +1,37 @@
 package com.pace.app
 
 import android.content.Context
-import android.content.SharedPreferences
+import androidx.datastore.core.DataStore
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
+import androidx.datastore.preferences.SharedPreferencesMigration
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
+import androidx.datastore.preferences.preferencesDataStoreFile
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import com.pace.app.ui.components.PaceSport
+import java.io.IOException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.map
 
 enum class PaceUnits { Metric, Imperial }
 enum class PaceThemeChoice { System, Light, Dark }
+
+internal object PacePreferenceKeys {
+    val onboardingComplete = booleanPreferencesKey("onboarding_complete")
+    val preferredSports = stringSetPreferencesKey("preferred_sports")
+    val units = stringPreferencesKey("measurement_units")
+    val theme = stringPreferencesKey("theme_choice")
+    val profileName = stringPreferencesKey("profile_name")
+    val lastSelectedTab = stringPreferencesKey("last_selected_tab")
+}
 
 data class PacePreferences(
     val onboardingComplete: Boolean = false,
@@ -16,63 +42,65 @@ data class PacePreferences(
     val lastSelectedTab: String = "home",
 )
 
-class PaceSettingsRepository(context: Context) {
-    private val preferences: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+internal fun decodePacePreferences(stored: Preferences): PacePreferences = try {
+    val defaults = PacePreferences()
+    val sports = stored[PacePreferenceKeys.preferredSports]
+        ?.mapNotNull { value -> runCatching { PaceSport.valueOf(value) }.getOrNull() }
+        ?.toSet()
+        ?.takeIf { it.isNotEmpty() }
+        ?: defaults.preferredSports
+    PacePreferences(
+        onboardingComplete = stored[PacePreferenceKeys.onboardingComplete] ?: defaults.onboardingComplete,
+        preferredSports = sports,
+        units = stored[PacePreferenceKeys.units]?.let { runCatching { PaceUnits.valueOf(it) }.getOrNull() } ?: defaults.units,
+        theme = stored[PacePreferenceKeys.theme]?.let { runCatching { PaceThemeChoice.valueOf(it) }.getOrNull() } ?: defaults.theme,
+        profileName = stored[PacePreferenceKeys.profileName].orEmpty(),
+        lastSelectedTab = stored[PacePreferenceKeys.lastSelectedTab]
+            ?.takeIf { it in setOf("home", "record", "maps", "insights") }
+            ?: defaults.lastSelectedTab,
+    )
+} catch (_: ClassCastException) {
+    PacePreferences()
+}
 
-    fun load(): PacePreferences = try {
-        val defaults = PacePreferences()
-        val savedSports = preferences.getStringSet(KEY_SPORTS, null)
-            ?.mapNotNull { value -> runCatching { PaceSport.valueOf(value) }.getOrNull() }
-            ?.toSet()
-            ?.takeIf { it.isNotEmpty() }
-            ?: defaults.preferredSports
-        PacePreferences(
-            onboardingComplete = preferences.getBoolean(KEY_ONBOARDING, defaults.onboardingComplete),
-            preferredSports = savedSports,
-            units = enumValue(preferences.getString(KEY_UNITS, null), defaults.units),
-            theme = enumValue(preferences.getString(KEY_THEME, null), defaults.theme),
-            profileName = preferences.getString(KEY_PROFILE_NAME, defaults.profileName).orEmpty(),
-            lastSelectedTab = preferences.getString(KEY_LAST_TAB, defaults.lastSelectedTab)
-                .takeIf { it in VALID_TABS }
-                ?: defaults.lastSelectedTab,
-        )
-    } catch (_: ClassCastException) {
-        recoverDefaults()
-    } catch (_: IllegalStateException) {
-        recoverDefaults()
+/** Local app configuration stored asynchronously with a one-time migration from P04 SharedPreferences. */
+class PaceSettingsRepository internal constructor(
+    context: Context,
+    storeName: String = DATASTORE_NAME,
+    legacyPreferencesName: String = LEGACY_PREFERENCES_NAME,
+) {
+    private val dataStore: DataStore<Preferences> = PreferenceDataStoreFactory.create(
+        migrations = listOf(SharedPreferencesMigration(context.applicationContext, legacyPreferencesName)),
+        corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+        scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+        produceFile = { context.applicationContext.preferencesDataStoreFile(storeName) },
+    )
+
+    val preferences: Flow<PacePreferences> = dataStore.data
+        .catch { error ->
+            if (error is IOException) emit(emptyPreferences()) else throw error
+        }
+        .map(::decodePacePreferences)
+
+    suspend fun save(value: PacePreferences) {
+        dataStore.edit { stored ->
+            stored.clear()
+            stored[PacePreferenceKeys.onboardingComplete] = value.onboardingComplete
+            stored[PacePreferenceKeys.preferredSports] = value.preferredSports.map { it.name }.toSet()
+            stored[PacePreferenceKeys.units] = value.units.name
+            stored[PacePreferenceKeys.theme] = value.theme.name
+            stored[PacePreferenceKeys.profileName] = value.profileName
+            stored[PacePreferenceKeys.lastSelectedTab] = value.lastSelectedTab.takeIf { it in VALID_TABS } ?: "home"
+        }
     }
 
-    fun save(value: PacePreferences) {
-        preferences.edit()
-            .putBoolean(KEY_ONBOARDING, value.onboardingComplete)
-            .putStringSet(KEY_SPORTS, value.preferredSports.map { it.name }.toSet())
-            .putString(KEY_UNITS, value.units.name)
-            .putString(KEY_THEME, value.theme.name)
-            .putString(KEY_PROFILE_NAME, value.profileName)
-            .putString(KEY_LAST_TAB, value.lastSelectedTab.takeIf { it in VALID_TABS } ?: "home")
-            .apply()
+    suspend fun clear() {
+        dataStore.edit { it.clear() }
     }
-
-    fun clear() {
-        preferences.edit().clear().commit()
-    }
-
-    private fun recoverDefaults(): PacePreferences {
-        preferences.edit().clear().commit()
-        return PacePreferences()
-    }
-
-    private inline fun <reified T : Enum<T>> enumValue(value: String?, default: T): T =
-        value?.let { runCatching { enumValueOf<T>(it) }.getOrNull() } ?: default
 
     private companion object {
-        const val PREFS_NAME = "pace_local_settings"
-        const val KEY_ONBOARDING = "onboarding_complete"
-        const val KEY_SPORTS = "preferred_sports"
-        const val KEY_UNITS = "measurement_units"
-        const val KEY_THEME = "theme_choice"
-        const val KEY_PROFILE_NAME = "profile_name"
-        const val KEY_LAST_TAB = "last_selected_tab"
+        const val DATASTORE_NAME = "pace_settings"
+        const val LEGACY_PREFERENCES_NAME = "pace_local_settings"
         val VALID_TABS = setOf("home", "record", "maps", "insights")
     }
 }

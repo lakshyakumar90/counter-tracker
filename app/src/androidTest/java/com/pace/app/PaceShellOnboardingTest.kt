@@ -7,7 +7,13 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.datastore.preferences.core.mutablePreferencesOf
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import android.content.Context
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -22,7 +28,7 @@ class PaceShellOnboardingTest {
     private lateinit var container: PaceAppContainer
 
     @Before
-    fun resetLocalPreferences() {
+    fun resetLocalPreferences(): Unit = runBlocking {
         container = (composeRule.activity.application as PaceApplication).container
         container.settingsRepository.clear()
         composeRule.activityRule.scenario.recreate()
@@ -34,7 +40,7 @@ class PaceShellOnboardingTest {
         composeRule.onNodeWithText("Skip setup").performClick()
 
         composeRule.onNodeWithText("Your training, at your pace").assertIsDisplayed()
-        assert(container.settingsRepository.load().onboardingComplete)
+        assert(runBlocking { container.settingsRepository.preferences.first().onboardingComplete })
     }
 
     @Test
@@ -52,7 +58,7 @@ class PaceShellOnboardingTest {
         composeRule.onNodeWithText("Use Pace locally").performClick()
 
         composeRule.onNodeWithText("Your training, at your pace").assertIsDisplayed()
-        val stored = container.settingsRepository.load()
+        val stored = runBlocking { container.settingsRepository.preferences.first() }
         assert(stored.onboardingComplete)
         assert(stored.units == PaceUnits.Imperial)
         assert(stored.theme == PaceThemeChoice.System)
@@ -68,7 +74,7 @@ class PaceShellOnboardingTest {
         composeRule.activityRule.scenario.recreate()
 
         composeRule.onNodeWithText("Record an activity to see local summaries and trends here.").assertIsDisplayed()
-        assert(container.settingsRepository.load().lastSelectedTab == "insights")
+        assert(runBlocking { container.settingsRepository.preferences.first().lastSelectedTab == "insights" })
     }
 
     @Test
@@ -80,16 +86,37 @@ class PaceShellOnboardingTest {
 
     @Test
     fun corruptSettingsRecoverToSafeDefaults() {
-        composeRule.activity.getSharedPreferences("pace_local_settings", 0)
-            .edit()
-            .putString("onboarding_complete", "corrupt")
-            .commit()
-
-        val recovered = container.settingsRepository.load()
+        val corrupt = mutablePreferencesOf(stringPreferencesKey("onboarding_complete") to "corrupt")
+        val recovered = decodePacePreferences(corrupt)
 
         assert(!recovered.onboardingComplete)
         assert(recovered.units == PaceUnits.Metric)
         assert(recovered.theme == PaceThemeChoice.System)
+    }
+
+    @Test
+    fun dataStoreMigratesP04SharedPreferencesToLocalSettings() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val suffix = System.currentTimeMillis().toString()
+        val legacyName = "pace_migration_test_$suffix"
+        val storeName = "pace_migration_test_$suffix"
+        context.getSharedPreferences(legacyName, Context.MODE_PRIVATE).edit()
+            .putBoolean("onboarding_complete", true)
+            .putString("measurement_units", PaceUnits.Imperial.name)
+            .putString("profile_name", "Test runner")
+            .putString("last_selected_tab", "insights")
+            .putStringSet("preferred_sports", setOf(PaceSport.Cycling.name))
+            .commit()
+
+        val migrationRepository = PaceSettingsRepository(context, storeName, legacyName)
+        val migrated = migrationRepository.preferences.first()
+
+        assert(migrated.onboardingComplete)
+        assert(migrated.units == PaceUnits.Imperial)
+        assert(migrated.profileName == "Test runner")
+        assert(migrated.lastSelectedTab == "insights")
+        assert(migrated.preferredSports == setOf(PaceSport.Cycling))
+        migrationRepository.clear()
     }
 
     @Test

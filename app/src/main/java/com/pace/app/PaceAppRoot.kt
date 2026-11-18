@@ -27,9 +27,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -63,6 +65,7 @@ import com.pace.app.ui.components.PaceTextAction
 import com.pace.app.ui.components.PaceTextField
 import com.pace.app.ui.theme.PaceTheme
 import com.pace.app.R
+import kotlinx.coroutines.launch
 
 private const val HOME = "home"
 private const val RECORD = "record"
@@ -78,13 +81,12 @@ fun PaceAppRoot(
     forceHome: Boolean = false,
     forceOnlineForTest: Boolean? = null,
 ) {
-    var preferences by remember { mutableStateOf(container.settingsRepository.load()) }
-    val updatePreferences: (PacePreferences) -> Unit = { updated ->
-        preferences = updated
-        container.settingsRepository.save(updated)
-    }
+    val preferences by container.settingsRepository.preferences.collectAsState(initial = null)
+    val currentPreferences = preferences
+    val scope = rememberCoroutineScope()
+    val updatePreferences: (PacePreferences) -> Unit = { updated -> scope.launch { container.settingsRepository.save(updated) } }
     val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
-    val darkTheme = when (preferences.theme) {
+    val darkTheme = when (currentPreferences?.theme ?: PaceThemeChoice.System) {
         PaceThemeChoice.System -> systemDark
         PaceThemeChoice.Light -> false
         PaceThemeChoice.Dark -> true
@@ -92,15 +94,17 @@ fun PaceAppRoot(
     val online = rememberPaceConnectivity(forceOnlineForTest)
 
     PaceTheme(darkTheme = darkTheme) {
-        if (preferences.onboardingComplete) {
+        if (currentPreferences == null) {
+            Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {}
+        } else if (currentPreferences.onboardingComplete) {
             PaceShell(
-                preferences = preferences,
+                preferences = currentPreferences,
                 onPreferencesChanged = updatePreferences,
                 forceHome = forceHome,
                 isOnline = online,
             )
         } else {
-            PaceOnboarding(preferences = preferences, isOnline = online, onComplete = updatePreferences)
+            PaceOnboarding(preferences = currentPreferences, isOnline = online, onComplete = updatePreferences)
         }
     }
 }
