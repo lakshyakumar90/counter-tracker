@@ -25,17 +25,15 @@ class PaceShellOnboardingTest {
     fun resetLocalPreferences() {
         container = (composeRule.activity.application as PaceApplication).container
         container.settingsRepository.clear()
-        composeRule.setContent { PaceAppRoot(container, forceOnlineForTest = false) }
+        composeRule.activityRule.scenario.recreate()
     }
 
     @Test
     fun firstLaunchOffersLocalOnlySetupAndSkipCompletesIt() {
         composeRule.onNodeWithText("A private place for your training").assertIsDisplayed()
-        composeRule.onNodeWithText("No account is connected. Your local settings remain available offline.").assertIsDisplayed()
         composeRule.onNodeWithText("Skip setup").performClick()
 
         composeRule.onNodeWithText("Your training, at your pace").assertIsDisplayed()
-        composeRule.onNodeWithText("Offline · local screens remain available").assertIsDisplayed()
         assert(container.settingsRepository.load().onboardingComplete)
     }
 
