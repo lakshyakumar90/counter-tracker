@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Pace synthetic fixture" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk><name>Synthetic short run</name><trkseg>
+    <trkpt lat="0.0" lon="0.0"><ele>10.0</ele><time>2026-01-01T00:00:00Z</time></trkpt>
+    <trkpt lat="0.0" lon="0.00001"><ele>10.2</ele><time>2026-01-01T00:00:03Z</time></trkpt>
+    <trkpt lat="0.0" lon="0.00002"><ele>10.4</ele><time>2026-01-01T00:00:06Z</time></trkpt>
+  </trkseg></trk>
+</gpx>

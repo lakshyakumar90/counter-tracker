@@ -73,6 +73,7 @@ A phase is **Go** only when its named gate is evidenced, relevant P0 dependencie
 | P19 Reliability/security | Release reliability, performance, security and accessibility matrix passes. |
 | P20 Beta/deployment | Signed installable beta, offline reliability evidence, current store requirements and disclosures complete. |
 | P21 Optional intelligence | Opt-in validated AI; no offline-core regression; privacy/cost controls approved. |
+| P22 Operations/growth | Support, monitoring, retention, recovery and next-version scope ready. |
 
 ## P05 checkpoint (2026-11-18)
 
@@ -96,7 +97,17 @@ No Supabase project credentials were present, so online account and two-user RLS
 checks have not run. P06 remains Hold until its account flow and profile isolation
 are verified against a configured development project. See
 [P06 completion evidence](phase-6-completion.md).
-| P22 Operations/growth | Support, monitoring, retention, recovery and next-version scope ready. |
+
+## P07 checkpoint (2026-11-18)
+
+The owner explicitly requested P07 while P06 online validation is still pending.
+This is the second recorded sequencing exception; it does not waive the open P05
+or P06 evidence requirements. P07 source now includes an offline Room-backed
+recorder, location foreground service, fused and platform location sources,
+sample filtering, notification controls, and interrupted-session recovery. The
+P07 device gate remains Hold until screen-off, airplane-mode, recovery, and
+battery behavior are evidenced on physical devices. See
+[P07 completion evidence](phase-7-completion.md).
 
 ## Release channels
 

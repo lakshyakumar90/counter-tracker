@@ -46,6 +46,9 @@ interface ActivityDao {
     @Query("SELECT * FROM activities WHERE id = :id")
     suspend fun getIncludingDeleted(id: String): ActivityEntity?
 
+    @Query("SELECT * FROM activities WHERE status IN ('RECORDING', 'PAUSED', 'RECOVERED') AND deleted_at_epoch_millis IS NULL ORDER BY started_at_epoch_millis DESC LIMIT 1")
+    suspend fun getActiveRecording(): ActivityEntity?
+
     @Transaction
     @Query("SELECT * FROM activities WHERE id = :id AND deleted_at_epoch_millis IS NULL")
     suspend fun getWithTrack(id: String): ActivityWithTrack?
@@ -53,6 +56,7 @@ interface ActivityDao {
     @Query("""
         SELECT * FROM activities
         WHERE owner_id = :ownerId
+          AND status = 'SAVED'
           AND deleted_at_epoch_millis IS NULL
           AND (:sport IS NULL OR sport = :sport)
           AND (:query IS NULL OR title LIKE '%' || :query || '%' OR notes LIKE '%' || :query || '%')
@@ -72,7 +76,7 @@ interface ActivityDao {
 
     @Query("""
         SELECT * FROM activities
-        WHERE owner_id = :ownerId AND deleted_at_epoch_millis IS NULL
+        WHERE owner_id = :ownerId AND status = 'SAVED' AND deleted_at_epoch_millis IS NULL
         ORDER BY started_at_epoch_millis DESC, id DESC
     """)
     fun observeHistory(ownerId: String = "local"): Flow<List<ActivityEntity>>
@@ -108,6 +112,9 @@ interface TrackPointDao {
 
     @Query("SELECT COUNT(*) FROM track_points WHERE activity_id = :activityId")
     suspend fun countForActivity(activityId: String): Int
+
+    @Query("SELECT * FROM track_points WHERE activity_id = :activityId ORDER BY sequence DESC LIMIT 1")
+    suspend fun lastForActivity(activityId: String): TrackPointEntity?
 }
 
 @Dao
