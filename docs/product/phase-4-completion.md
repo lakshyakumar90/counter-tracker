@@ -51,9 +51,10 @@ Plan exclusion, corrupt-settings recovery, offline state, and shell destinations
 - Map coverage and Insights remain empty/unavailable until their data and
   licensing phases supply real content. No synthetic production totals or
   unlicensed map assets are included.
-- P03's physical-device UI test and visual review are still outstanding because
-  no Android device was attached. P04 was started at the user's explicit
-  direction; this does not change the recorded P03 gate status.
-- The P04 source is implemented. The phase's Go status still requires the
-  Gradle checks and UI test execution evidence to pass; no emulator or system
-  image is part of this workflow.
+- P03's physical-device UI tests passed on a Motorola Edge 60 Pro running
+  Android 17. A separate manual visual review remains outstanding.
+- P04's code checks passed (Kotlin compilation, test-source compilation, unit
+  tests, lint, and formatting), and all 11 instrumented UI tests passed on the
+  same physical device. The debug app APK remained up to date; only the changed
+  Android test APK was repackaged. No emulator or system image is part of this
+  workflow.
