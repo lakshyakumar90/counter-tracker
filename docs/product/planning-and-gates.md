@@ -109,6 +109,19 @@ P07 device gate remains Hold until screen-off, airplane-mode, recovery, and
 battery behavior are evidenced on physical devices. See
 [P07 completion evidence](phase-7-completion.md).
 
+## P08 checkpoint (2026-11-18)
+
+The owner asked to proceed with P08 while the P07 device gate remains open. This
+sequencing exception is recorded; it does not mark P07 complete. P08-T001/T002
+now select OpenFreeMap's public MapLibre vector style for the initial prototype,
+define provisional per-pack and aggregate storage limits, and render the online
+map in the Maps screen with an offline/load-failure fallback. The provider's
+public service has no SLA and may be discontinued, so P08's packaged fallback
+and local pack behavior remain required. The phone is currently absent from ADB; P08 APK
+installation and offline runtime checks are pending until it is connected. See
+[P08 progress](phase-8-completion.md) and the
+[provider/storage decision](../platform/offline-map-provider.md).
+
 ## Release channels
 
 1. **Developer/debug APK:** local and CI validation only; test data; not a public promise.

@@ -96,6 +96,7 @@ dependencies {
     implementation(libs.supabase.auth)
     implementation(libs.ktor.client.android)
     implementation(libs.play.services.location)
+    implementation(libs.maplibre.android.sdk)
     ksp(libs.androidx.room.compiler)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)

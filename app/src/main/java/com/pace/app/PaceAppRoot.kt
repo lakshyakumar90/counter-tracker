@@ -78,6 +78,7 @@ import com.pace.app.ui.components.PaceSegment
 import com.pace.app.ui.components.PaceSegmentedControl
 import com.pace.app.ui.components.PaceSport
 import com.pace.app.ui.components.PaceSportSelectorTile
+import com.pace.app.ui.maps.PaceMapPanel
 import com.pace.app.ui.components.PaceTextAction
 import com.pace.app.ui.components.PaceTextField
 import com.pace.app.ui.theme.PaceTheme
@@ -504,11 +505,18 @@ private fun PaceRecordScreen(preferences: PacePreferences, modifier: Modifier = 
 
 @Composable
 private fun PaceMapsScreen(modifier: Modifier = Modifier) {
-    Column(modifier.verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(stringResource(R.string.pace_map_title), style = MaterialTheme.typography.headlineMedium, modifier = Modifier.semantics { heading() })
-        PaceEmptyState(
-            title = stringResource(R.string.pace_map_unavailable_title),
-            message = stringResource(R.string.pace_map_unavailable_body),
+        Text(
+            stringResource(R.string.pace_map_screen_description),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        PaceMapPanel(Modifier.fillMaxWidth())
+        Text(
+            stringResource(R.string.pace_map_recording_independent),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }

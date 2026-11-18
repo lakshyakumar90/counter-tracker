@@ -20,7 +20,8 @@
 
 - Keep UI strings in Android resources and dependencies in the Gradle version catalog.
 - Add or update focused tests with behavior changes. Run the relevant unit tests, lint, and formatting checks before calling a task complete when the toolchain is available.
-- Prefer code-only checks (`compile`, unit tests, lint, and formatting) during implementation. Do not run `assembleDebug`, `assembleRelease`, `bundleRelease`, or other APK/AAB packaging tasks unless the user explicitly asks for a build. Batch relevant checks after a coherent change instead of rebuilding after every small edit.
-- Do not install or create Android emulators or system images. Use a connected physical Android device only when device testing is needed and one is available.
+- Prefer code-only checks (`compile`, unit tests, lint, and formatting) after coherent implementation steps. Do not package after every edit. At planned runtime/device checkpoints and phase gates, build the APK/AAB needed for the acceptance work every now and then, and explain before the build why packaging is needed and what runtime behavior it allows us to test.
+- When an APK build is part of the planned device verification or the owner asks for one, install the resulting debug APK on the owner's connected, authorized physical Android phone, then run the relevant manual/device checks and report the result. If ADB shows no authorized physical device, do not claim installation or device validation; continue code-only checks and report that APK installation is waiting for the phone. Do not install or create Android emulators or system images.
+- Do not build a release AAB unless a roadmap release task or the owner explicitly requests it. Never use emulator/system-image setup as a substitute for a missing physical phone.
 - Preserve accessibility, lifecycle safety, and screen-off recording requirements when their phases are reached.
 - Document setup changes and decisions in `README.md` or a short architecture decision record.
