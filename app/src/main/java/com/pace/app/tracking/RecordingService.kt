@@ -36,6 +36,7 @@ class RecordingService : Service() {
     @Volatile private var activity: ActivityEntity? = null
     private var filter: TrackSampleFilter? = null
     private var sequence = 0
+    private var segmentIndex = 0
     private var distanceRemainderMeters = 0.0
     private var pausedMillis = 0L
     private var pausedAtMillis: Long? = null
@@ -69,6 +70,7 @@ class RecordingService : Service() {
         activity = entity
         isRunning = true
         sequence = 0
+        segmentIndex = 0
         distanceRemainderMeters = 0.0
         pausedMillis = 0
         segmentStartedAtMillis = now
@@ -83,6 +85,7 @@ class RecordingService : Service() {
         if (existing == null) { stopSelf(); return@launch }
         activity = existing
         sequence = database.trackPointDao().countForActivity(existing.id)
+        segmentIndex = (database.trackPointDao().lastForActivity(existing.id)?.segmentIndex ?: -1) + 1
         pausedMillis = existing.dataQualityFlags.substringAfter("PAUSED_MS=", "0").substringBefore(';').toLongOrNull() ?: 0
         val now = System.currentTimeMillis()
         val storedPauseAt = existing.dataQualityFlags.substringAfter("PAUSED_AT=", "").substringBefore(';').toLongOrNull()
@@ -180,12 +183,16 @@ class RecordingService : Service() {
     private fun saveSample(sample: TrackSample) {
         if (activity?.status != "RECORDING") return
         val activeFilter = filter ?: return
-        if (!activeFilter.accept(sample)) return
+        val decision = activeFilter.evaluate(sample)
+        if (!decision.accepted) return
+        if (decision.startsNewSegment) segmentIndex += 1
+        val acceptedSegment = segmentIndex
         scope.launch {
             sampleMutex.withLock {
                 val current = activity ?: return@withLock
                 val previous = database.trackPointDao().lastForActivity(current.id)
-                val addedDistance = previous?.let { haversineMeters(it.latitude, it.longitude, sample.latitude, sample.longitude) } ?: 0.0
+                val addedDistance = previous?.takeIf { it.segmentIndex == acceptedSegment }
+                    ?.let { haversineMeters(it.latitude, it.longitude, sample.latitude, sample.longitude) } ?: 0.0
                 val exactDistance = distanceRemainderMeters + addedDistance
                 val wholeMeters = exactDistance.toLong()
                 distanceRemainderMeters = exactDistance - wholeMeters
@@ -199,6 +206,7 @@ class RecordingService : Service() {
                     horizontalAccuracyMeters = sample.accuracyMeters,
                     speedMetersPerSecond = sample.speedMetersPerSecond,
                     bearingDegrees = sample.bearingDegrees,
+                    segmentIndex = acceptedSegment,
                 )
                 val now = System.currentTimeMillis()
                 val elapsed = elapsedBeforeSegmentSeconds + (now - segmentStartedAtMillis).coerceAtLeast(0) / 1000

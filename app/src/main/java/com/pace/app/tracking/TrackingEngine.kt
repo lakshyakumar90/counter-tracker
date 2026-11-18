@@ -20,22 +20,31 @@ data class TrackSample(
 /** Pure validation and distance logic shared by real and replay location sources. */
 class TrackSampleFilter(private val maximumSpeedMetersPerSecond: Double) {
     private var previous: TrackSample? = null
+    private val maximumContinuousGapMillis = 30_000L
 
-    fun accept(sample: TrackSample): Boolean {
-        if (sample.timestampEpochMillis <= 0L || !sample.latitude.isFinite() || !sample.longitude.isFinite()) return false
-        if (sample.latitude !in -90.0..90.0 || sample.longitude !in -180.0..180.0) return false
-        if (sample.accuracyMeters != null && (!sample.accuracyMeters.isFinite() || sample.accuracyMeters <= 0f || sample.accuracyMeters > 100f)) return false
+    fun accept(sample: TrackSample): Boolean = evaluate(sample).accepted
+
+    fun evaluate(sample: TrackSample): SampleDecision {
+        if (sample.timestampEpochMillis <= 0L || !sample.latitude.isFinite() || !sample.longitude.isFinite()) return SampleDecision(false)
+        if (sample.latitude !in -90.0..90.0 || sample.longitude !in -180.0..180.0) return SampleDecision(false)
+        if (sample.accuracyMeters != null && (!sample.accuracyMeters.isFinite() || sample.accuracyMeters <= 0f || sample.accuracyMeters > 100f)) return SampleDecision(false)
         val before = previous
         if (before != null) {
             val deltaMillis = sample.timestampEpochMillis - before.timestampEpochMillis
-            if (deltaMillis <= 0L) return false
+            if (deltaMillis <= 0L) return SampleDecision(false)
+            if (deltaMillis > maximumContinuousGapMillis) {
+                previous = sample
+                return SampleDecision(accepted = true, startsNewSegment = true)
+            }
             val speed = haversineMeters(before.latitude, before.longitude, sample.latitude, sample.longitude) / (deltaMillis / 1000.0)
-            if (speed > maximumSpeedMetersPerSecond) return false
+            if (speed > maximumSpeedMetersPerSecond) return SampleDecision(false)
         }
         previous = sample
-        return true
+        return SampleDecision(accepted = true)
     }
 }
+
+data class SampleDecision(val accepted: Boolean, val startsNewSegment: Boolean = false)
 
 fun haversineMeters(latitudeA: Double, longitudeA: Double, latitudeB: Double, longitudeB: Double): Double {
     val earthRadiusMeters = 6_371_000.0

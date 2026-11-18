@@ -7,6 +7,9 @@
 - Added Haversine distance for the recorder engine. P11 must consume this shared
   function and add its golden metric fixtures rather than implementing a second
   distance formula.
+- Added route segment indexes and a schema migration so a location gap over
+  30 seconds or an explicit pause/resume starts a new line; distance is not
+  added between those segments.
 - Added a swappable location source boundary, Google Play fused high-accuracy
   source, and Android `LocationManager` fallback for devices without a working
   fused provider. Sampling is configured per activity type (2 seconds cycling,
@@ -34,8 +37,8 @@
 | T005–T009 | Permission flow, location FGS, visible start, and persistent notification implemented. |
 | T010–T012 | Notification pause/resume and save actions implemented; in-app finish asks for confirmation. |
 | T013–T014 | Provider-unavailable and no-fix states are visible; accepted fix accuracy is shown in the active recording UI. |
-| T015–T018 | Sport sampling, validation, jump filtering, and shared Haversine distance implemented. |
-| T019–T026 | Moving-time auto-pause, pace/speed/elevation calculations, and sport-specific tuned thresholds remain for P11/device calibration. Manual pause/resume is implemented. |
+| T015–T018 | Sport sampling, validation, jump filtering, segment gap handling, and shared Haversine distance implemented. |
+| T019–T026 | Explicit pause time is handled; pace/speed/elevation calculations remain for P11. Auto-pause is intentionally not implemented: P00 says V1 moving time excludes only explicit pauses and prohibits silent auto-pause. Manual pause/resume is implemented. |
 | T027–T030 | Room checkpoint and explicit recovery path implemented; permission loss and GPS reacquisition handling are source-covered but need fault-injection/device validation. |
 | T031–T034 | Battery measurement, airplane-mode, screen-lock, calls, and multi-app field runs remain device evidence; no emulator is used. |
 | T101 | Added a secure XML GPX parser and Handler-based replay `LocationSource`; the synthetic golden GPX fixture is covered by a JVM test. |
@@ -46,7 +49,7 @@
 
 - APK/AAB packaging was not run. Per `AGENTS.md`, only code checks are allowed
   unless the owner explicitly asks for a build.
-- Main and Android-test Kotlin compilation passed. Ten JVM tests passed with no
+- Main and Android-test Kotlin compilation passed. Eleven JVM tests passed with no
   failures. Lint and formatting checks passed; lint reports existing warnings
   for older pinned SDK/dependency versions and the API-33 locale attribute.
 - This phase is **Hold** until a real-device run confirms continuous screen-off
@@ -60,6 +63,18 @@ The owner explicitly asked to proceed with P07 while P06 online authentication
 validation remains pending (and while the earlier P05 migration/device gate also
 remains pending). This exception is recorded in
 [`planning-and-gates.md`](planning-and-gates.md); it does not close those gates.
+
+## Product-rule reconciliation
+
+The P07 roadmap asks for auto-pause (T024), while the accepted P00 calculation
+contract explicitly says V1 moving time excludes only user-requested pauses and
+must not silently auto-pause. P00 governs implementation, so auto-pause stays
+off unless the product owner changes that decision. The P07 filter accepts fixes
+with accuracy at most 100 m, requires strictly increasing timestamps, rejects
+apparent speed above 15 m/s for walk/run/jog and 45 m/s for cycling, and begins a
+new route segment after a gap longer than 30 seconds. These are implementation
+thresholds and still need calibration against more synthetic golden tracks and
+physical-device runs before release.
 
 Android platform references: [foreground services](https://developer.android.com/develop/background-work/services/foreground-services),
 [location permissions](https://developer.android.com/develop/sensors-and-location/location/permissions),

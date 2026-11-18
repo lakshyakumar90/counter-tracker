@@ -221,6 +221,7 @@ class PaceDatabaseTest {
 
         val upgraded = Room.databaseBuilder(context, PaceDatabase::class.java, fileName)
             .addMigrations(PaceDatabase.MIGRATION_1_2)
+            .addMigrations(PaceDatabase.MIGRATION_2_3)
             .allowMainThreadQueries()
             .build()
         try {
@@ -233,6 +234,12 @@ class PaceDatabaseTest {
             assertEquals("local", restored?.ownerId)
             assertEquals(0L, restored?.movingSeconds)
             assertEquals("", restored?.dataQualityFlags)
+            val columns = upgraded.openHelper.readableDatabase.query("PRAGMA table_info(track_points)")
+            val columnNames = buildList {
+                while (columns.moveToNext()) add(columns.getString(columns.getColumnIndexOrThrow("name")))
+                columns.close()
+            }
+            assertTrue(columnNames.contains("segment_index"))
         } finally {
             upgraded.close()
             context.deleteDatabase(fileName)

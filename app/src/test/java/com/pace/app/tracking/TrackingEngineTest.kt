@@ -33,6 +33,15 @@ class TrackingEngineTest {
     }
 
     @Test
+    fun longLocationGapStartsNewRouteSegmentInsteadOfBridgingDistance() {
+        val filter = TrackSampleFilter(maximumSpeedMetersPerSecond = 15.0)
+        assertTrue(filter.evaluate(sample(time = 1_000, lat = 0.0, lon = 0.0)).accepted)
+        val next = filter.evaluate(sample(time = 32_000, lat = 0.0, lon = 0.01))
+        assertTrue(next.accepted)
+        assertTrue(next.startsNewSegment)
+    }
+
+    @Test
     fun haversineProducesExpectedDistanceForKnownCoordinateDelta() {
         val meters = haversineMeters(0.0, 0.0, 0.0, 0.001)
         assertEquals(111.2, meters, 1.0)

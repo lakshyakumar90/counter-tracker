@@ -40,7 +40,7 @@ import com.pace.app.data.local.entity.WorkoutTemplateEntity
         MapPackMetadataEntity::class,
         SyncOperationEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class PaceDatabase : RoomDatabase() {
@@ -105,12 +105,20 @@ abstract class PaceDatabase : RoomDatabase() {
             }
         }
 
+        /** Keep GPS points on separate route lines when location continuity was lost. */
+        val MIGRATION_2_3: Migration = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE track_points ADD COLUMN segment_index INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun create(context: Context): PaceDatabase = Room.databaseBuilder(
             context.applicationContext,
             PaceDatabase::class.java,
             DATABASE_NAME,
         )
             .addMigrations(MIGRATION_1_2)
+            .addMigrations(MIGRATION_2_3)
             .build()
     }
 }

@@ -60,6 +60,7 @@ data class TrackPointEntity(
     @ColumnInfo(name = "horizontal_accuracy_meters") val horizontalAccuracyMeters: Float? = null,
     @ColumnInfo(name = "speed_meters_per_second") val speedMetersPerSecond: Float? = null,
     @ColumnInfo(name = "bearing_degrees") val bearingDegrees: Float? = null,
+    @ColumnInfo(name = "segment_index", defaultValue = "0") val segmentIndex: Int = 0,
 )
 
 @Entity(
