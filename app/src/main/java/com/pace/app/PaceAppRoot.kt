@@ -293,6 +293,7 @@ private fun PaceShell(
                             onPreferencesChanged = onPreferencesChanged,
                             onSelectTab = selectTab,
                             onOpenProfile = openProfile,
+                            isOnline = isOnline,
                             modifier = Modifier.fillMaxSize(),
                         )
                     }
@@ -335,6 +336,7 @@ private fun PaceShell(
                             onPreferencesChanged = onPreferencesChanged,
                             onSelectTab = selectTab,
                             onOpenProfile = openProfile,
+                            isOnline = isOnline,
                             modifier = Modifier.weight(1f).fillMaxWidth(),
                         )
                     }
@@ -352,12 +354,13 @@ private fun PaceDestinationContent(
     onPreferencesChanged: (PacePreferences) -> Unit,
     onSelectTab: (String) -> Unit,
     onOpenProfile: () -> Unit,
+    isOnline: Boolean,
     modifier: Modifier = Modifier,
 ) {
     when (route) {
         HOME -> PaceHomeScreen(preferences, onSelectTab, onOpenProfile, modifier)
         RECORD -> PaceRecordScreen(preferences, modifier)
-        MAPS -> PaceMapsScreen(modifier)
+        MAPS -> PaceMapsScreen(preferences, isOnline, modifier)
         INSIGHTS -> PaceInsightsScreen(onSelectTab, modifier)
         PROFILE -> PaceProfileScreen(preferences, authRepository, onPreferencesChanged, modifier)
         PLAN -> if (PLAN_DESTINATION_ENABLED) PacePlanScopeScreen(modifier) else PaceHomeScreen(preferences, onSelectTab, onOpenProfile, modifier)
@@ -504,7 +507,13 @@ private fun PaceRecordScreen(preferences: PacePreferences, modifier: Modifier = 
 }
 
 @Composable
-private fun PaceMapsScreen(modifier: Modifier = Modifier) {
+private fun PaceMapsScreen(preferences: PacePreferences, isOnline: Boolean, modifier: Modifier = Modifier) {
+    val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
+    val mapDarkTheme = when (preferences.theme) {
+        PaceThemeChoice.System -> systemDark
+        PaceThemeChoice.Light -> false
+        PaceThemeChoice.Dark -> true
+    }
     Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(stringResource(R.string.pace_map_title), style = MaterialTheme.typography.headlineMedium, modifier = Modifier.semantics { heading() })
         Text(
@@ -512,7 +521,7 @@ private fun PaceMapsScreen(modifier: Modifier = Modifier) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        PaceMapPanel(Modifier.fillMaxWidth())
+        PaceMapPanel(darkTheme = mapDarkTheme, isOnline = isOnline, modifier = Modifier.fillMaxWidth())
         Text(
             stringResource(R.string.pace_map_recording_independent),
             style = MaterialTheme.typography.labelMedium,

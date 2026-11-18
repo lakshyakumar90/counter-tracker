@@ -6,7 +6,8 @@
 ## Provider and renderer
 
 - **Renderer:** MapLibre Native Android, using its offline region support.
-- **Initial tile/style source:** OpenFreeMap Liberty (`https://tiles.openfreemap.org/styles/liberty`).
+- **Light style:** OpenFreeMap Liberty (`https://tiles.openfreemap.org/styles/liberty`).
+- **Dark style:** OpenFreeMap Dark (`https://tiles.openfreemap.org/styles/dark`). The provider's style repository documents this endpoint; Dark is still described as an unmodified upstream style, so review the rendered result before release.
 - **Cost/account:** the OpenFreeMap public service currently advertises free commercial use with no API key or registration.
 - **Visible credit:** keep MapLibre's attribution control visible. The source lists `OpenFreeMap © OpenMapTiles Data from OpenStreetMap` and links the OpenStreetMap copyright page.
 
@@ -35,3 +36,5 @@ First launch without a saved pack, provider failure, and panning beyond a saved 
 ## Recheck before distribution
 
 Before a public release, re-read the provider terms, verify their offline limits and attribution in the actual Android UI, and decide whether an SLA/self-hosted source is needed. If OpenFreeMap changes or withdraws its public service, keep existing packs usable and replace the source behind the MapLibre provider boundary; do not fall back to the OSM Foundation's standard tile endpoint for bulk downloads.
+
+Style reference: [OpenFreeMap styles repository](https://github.com/hyperknot/openfreemap-styles/).

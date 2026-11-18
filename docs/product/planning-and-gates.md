@@ -114,10 +114,10 @@ battery behavior are evidenced on physical devices. See
 The owner asked to proceed with P08 while the P07 device gate remains open. This
 sequencing exception is recorded; it does not mark P07 complete. P08-T001/T002
 now select OpenFreeMap's public MapLibre vector style for the initial prototype,
-define provisional per-pack and aggregate storage limits, and render the online
-map in the Maps screen with an offline/load-failure fallback. The provider's
-public service has no SLA and may be discontinued, so P08's packaged fallback
-and local pack behavior remain required. The phone is currently absent from ADB; P08 APK
+define provisional per-pack and aggregate storage limits, and render light/dark
+online styles with retry and a packaged, non-geographic no-tile illustration.
+The provider's public service has no SLA and may be discontinued, so P08's
+saved-region support remains required. The phone is currently absent from ADB; P08 APK
 installation and offline runtime checks are pending until it is connected. See
 [P08 progress](phase-8-completion.md) and the
 [provider/storage decision](../platform/offline-map-provider.md).

@@ -107,6 +107,7 @@
     <string name="pace_map_screen_description">View the map. Offline area downloads are not available yet.</string>
     <string name="pace_map_recording_independent">Activity recording continues when map tiles are unavailable.</string>
     <string name="pace_map_loading">Loading map…</string>
+    <string name="pace_map_retry">Try again</string>
     <string name="pace_insights_title">Insights</string>
     <string name="pace_insights_empty_body">Record an activity to see local summaries and trends here.</string>
     <string name="pace_back_to_home">Back to Home</string>
