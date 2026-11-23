@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Delete your Pace account</title>
+  <style>
+    :root { color-scheme: light dark; font: 16px/1.5 system-ui, sans-serif; }
+    body { max-width: 38rem; margin: 8vh auto; padding: 0 1.25rem; }
+    main { padding: 1.5rem; border: 1px solid #8886; border-radius: 1rem; }
+    label { display: block; margin: 1rem 0 .35rem; }
+    input { box-sizing: border-box; width: 100%; padding: .75rem; font: inherit; }
+    button { margin-top: 1rem; padding: .75rem 1rem; font: inherit; }
+    #message { min-height: 1.5em; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Delete your Pace account</h1>
+  <p>This permanently deletes the signed-in Pace account, its cloud activity summaries, plans, goals, personal records, saved routes, and private route archives. This page cannot erase copies saved on a device; use Profile → Privacy and your data → Delete local fitness data on each device.</p>
+  <p>Sign in below to confirm account ownership. Account deletion cannot be undone. Do not use a shared or public device.</p>
+  <form id="delete-form">
+    <label for="email">Account email</label>
+    <input id="email" type="email" autocomplete="username" required>
+    <label for="password">Password</label>
+    <input id="password" type="password" autocomplete="current-password" required>
+    <label><input id="confirm" type="checkbox" required> I understand this permanently deletes my Pace account and cloud backup.</label>
+    <button id="submit" type="submit">Delete account and cloud data</button>
+  </form>
+  <p id="message" role="status" aria-live="polite"></p>
+</main>
+<script>
+  // Set these public client values when publishing this page. Never place a service-role key here.
+  const SUPABASE_URL = "https://YOUR-PROJECT-REF.supabase.co";
+  const SUPABASE_PUBLISHABLE_KEY = "YOUR-PUBLISHABLE-KEY";
+  const form = document.querySelector("#delete-form");
+  const message = document.querySelector("#message");
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = document.querySelector("#submit");
+    button.disabled = true;
+    message.textContent = "Signing in and deleting account data…";
+    let token = null;
+    try {
+      const login = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+        method: "POST",
+        headers: { "apikey": SUPABASE_PUBLISHABLE_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({ email: document.querySelector("#email").value, password: document.querySelector("#password").value }),
+      });
+      if (!login.ok) throw new Error("Sign-in failed. Check the email and password, then try again.");
+      token = (await login.json()).access_token;
+      const deletion = await fetch(`${SUPABASE_URL}/functions/v1/delete-account`, {
+        method: "POST",
+        headers: { "apikey": SUPABASE_PUBLISHABLE_KEY, "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+        body: "{}",
+      });
+      if (!deletion.ok) throw new Error("Deletion could not be completed. Your account has not been confirmed deleted; contact Pace support.");
+      form.reset();
+      document.querySelector("#password").value = "";
+      message.textContent = "Your Pace account and cloud data have been deleted.";
+    } catch (error) {
+      message.textContent = error instanceof Error ? error.message : "Request failed. Try again later.";
+    } finally {
+      token = null;
+      button.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>

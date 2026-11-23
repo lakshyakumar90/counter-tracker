@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1120" viewBox="0 0 1600 1120" role="img" aria-labelledby="title desc">
+<title id="title">PACE visual resources: free icon, avatar and motion references</title>
+<desc id="desc">A visual reference sheet of permissively licensed icon and avatar resources and official Jetpack Compose motion documentation.</desc>
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#F6F5F0"/><stop offset="1" stop-color="#E7EFEB"/></linearGradient>
+  <style>
+    .ink{fill:#1C2426}.sub{fill:#536267}.orange{fill:#F06432}.teal{fill:#1E7480}.mint{fill:#B8D9C8}
+    .title{font:700 54px 'Arial',sans-serif;letter-spacing:-1px}.lead{font:400 24px 'Arial',sans-serif}
+    .head{font:700 28px 'Arial',sans-serif}.body{font:400 20px 'Arial',sans-serif}.small{font:400 17px 'Arial',sans-serif}
+    .link{font:600 18px 'Arial',sans-serif;fill:#1E7480;text-decoration:underline}
+  </style>
+</defs>
+<rect width="1600" height="1120" fill="url(#bg)"/>
+<path d="M0 0h1600v18H0z" fill="#F06432"/>
+<text x="80" y="112" class="title ink">PACE visual resources</text>
+<text x="80" y="158" class="lead sub">Free starting points for icons, avatars and motion — check the selected asset’s license before shipping.</text>
+<g transform="translate(80 218)">
+  <rect width="700" height="330" rx="26" fill="#FFFFFF" stroke="#D3DDD8" stroke-width="2"/>
+  <circle cx="48" cy="52" r="25" fill="#FCE6DC"/><path d="M37 52h22m-9-9 9 9-9 9" fill="none" stroke="#F06432" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="92" y="62" class="head ink">Lucide Icons</text>
+  <text x="38" y="112" class="body sub">Consistent outline icons for navigation, actions,</text><text x="38" y="142" class="body sub">fitness and settings. ISC license; see notice.</text>
+  <a href="https://lucide.dev/license"><text x="38" y="195" class="link">lucide.dev/license</text></a>
+  <text x="38" y="248" class="small ink">Use one stroke family. Keep each icon inside a 48 dp</text><text x="38" y="276" class="small ink">touch target and label icon-only actions.</text>
+  <g transform="translate(470 226)" fill="none" stroke="#1E7480" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="10"/><path d="M18 3v5m0 20v5M3 18h5m20 0h5M42 10l14 14m-14 0 14-14"/></g>
+</g>
+<g transform="translate(820 218)">
+  <rect width="700" height="330" rx="26" fill="#FFFFFF" stroke="#D3DDD8" stroke-width="2"/>
+  <circle cx="48" cy="52" r="25" fill="#DDF0EB"/><path d="M36 42h24v20H36zM42 36v-5m12 5v-5" fill="none" stroke="#1E7480" stroke-width="4" stroke-linecap="round"/>
+  <text x="92" y="62" class="head ink">Google Material Symbols</text>
+  <text x="38" y="112" class="body sub">Android-ready symbols in outlined, rounded and</text><text x="38" y="142" class="body sub">sharp styles. Apache License 2.0 in the source repo.</text>
+  <a href="https://fonts.google.com/icons"><text x="38" y="195" class="link">fonts.google.com/icons</text></a>
+  <a href="https://github.com/google/material-design-icons/blob/master/LICENSE"><text x="38" y="230" class="link">Google icon license</text></a>
+  <text x="38" y="282" class="small ink">Choose either this or Lucide for a screen family.</text>
+  <g transform="translate(500 235)" fill="#1E7480"><path d="M0 8h10v10H0zM18 0h10v18H18zM36 12h10v16H36zM54 4h10v24H54z"/></g>
+</g>
+<g transform="translate(80 585)">
+  <rect width="700" height="330" rx="26" fill="#FFFFFF" stroke="#D3DDD8" stroke-width="2"/>
+  <circle cx="48" cy="52" r="25" fill="#EAF3E6"/><circle cx="48" cy="44" r="9" fill="#1E7480"/><path d="M31 69c2-12 10-17 17-17s15 5 17 17" fill="#B8D9C8"/>
+  <text x="92" y="62" class="head ink">DiceBear avatars</text>
+  <text x="38" y="112" class="body sub">Generated SVG portraits, stable from a seed. Style</text><text x="38" y="142" class="body sub">licenses differ: select a CC0 style for no attribution.</text>
+  <a href="https://www.dicebear.com/licenses/"><text x="38" y="195" class="link">dicebear.com/licenses</text></a>
+  <a href="https://www.dicebear.com/styles/"><text x="38" y="230" class="link">Browse avatar styles</text></a>
+  <text x="38" y="282" class="small ink">Offer initials or a generated avatar; never require a photo.</text>
+  <circle cx="548" cy="166" r="50" fill="#D7EEE7"/><circle cx="548" cy="149" r="18" fill="#C77B46"/><path d="M512 203c5-30 23-43 36-43s31 13 36 43" fill="#1E7480"/>
+</g>
+<g transform="translate(820 585)">
+  <rect width="700" height="330" rx="26" fill="#FFFFFF" stroke="#D3DDD8" stroke-width="2"/>
+  <circle cx="48" cy="52" r="25" fill="#FFF0D7"/><path d="M34 56h10l7-15 8 28 7-13h7" fill="none" stroke="#F06432" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="92" y="62" class="head ink">Jetpack Compose motion</text>
+  <text x="38" y="112" class="body sub">Built-in state-driven transitions for selected icons,</text><text x="38" y="142" class="body sub">expanding details, route reveal and reduced motion.</text>
+  <a href="https://developer.android.com/develop/ui/compose/animation/composables-modifiers"><text x="38" y="195" class="link">Compose animation guide</text></a>
+  <a href="https://developer.android.com/develop/ui/compose/animation"><text x="38" y="230" class="link">Animation APIs</text></a>
+  <text x="38" y="282" class="small ink">Animate user actions; keep recording and GPS status stable.</text>
+  <path d="M495 221c30-65 55 45 83-20s50 28 75-35" fill="none" stroke="#1E7480" stroke-width="6" stroke-linecap="round"/><circle cx="495" cy="221" r="8" fill="#F06432"/><rect x="642" y="153" width="16" height="16" rx="3" fill="#F06432"/>
+</g>
+<text x="80" y="1000" class="head ink">A note on permissions</text>
+<text x="80" y="1040" class="body sub">“Free” does not mean license-free. Follow each license’s notice and attribution rules. The generated PACE concept art is original mockup artwork.</text>
+<rect x="80" y="1070" width="1440" height="4" rx="2" fill="#1E7480"/>
+</svg>

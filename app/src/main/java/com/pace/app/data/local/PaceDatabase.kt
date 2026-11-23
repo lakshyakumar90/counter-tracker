@@ -7,16 +7,23 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.pace.app.data.local.dao.ActivityDao
+import com.pace.app.data.local.dao.ActivityAggregateDao
 import com.pace.app.data.local.dao.GoalDao
 import com.pace.app.data.local.dao.MapPackDao
+import com.pace.app.data.local.dao.HomeWorkoutDraftDao
 import com.pace.app.data.local.dao.SensorSampleDao
+import com.pace.app.data.local.dao.SavedRouteDao
 import com.pace.app.data.local.dao.SplitDao
 import com.pace.app.data.local.dao.SyncOperationDao
 import com.pace.app.data.local.dao.TrackPointDao
 import com.pace.app.data.local.dao.WorkoutDao
 import com.pace.app.data.local.entity.ActivityEntity
+import com.pace.app.data.local.entity.ActivityAggregateCacheEntity
+import com.pace.app.data.local.entity.SavedRouteEntity
+import com.pace.app.data.local.entity.SavedRoutePointEntity
 import com.pace.app.data.local.entity.GoalEntity
 import com.pace.app.data.local.entity.MapPackMetadataEntity
+import com.pace.app.data.local.entity.HomeWorkoutDraftEntity
 import com.pace.app.data.local.entity.PersonalRecordEntity
 import com.pace.app.data.local.entity.PlannedSessionEntity
 import com.pace.app.data.local.entity.SensorSampleEntity
@@ -29,6 +36,9 @@ import com.pace.app.data.local.entity.WorkoutTemplateEntity
 @Database(
     entities = [
         ActivityEntity::class,
+        ActivityAggregateCacheEntity::class,
+        SavedRouteEntity::class,
+        SavedRoutePointEntity::class,
         TrackPointEntity::class,
         SplitEntity::class,
         SensorSampleEntity::class,
@@ -38,20 +48,26 @@ import com.pace.app.data.local.entity.WorkoutTemplateEntity
         GoalEntity::class,
         PersonalRecordEntity::class,
         MapPackMetadataEntity::class,
+        HomeWorkoutDraftEntity::class,
         SyncOperationEntity::class,
+        com.pace.app.data.local.dao.DailySteps::class,
     ],
-    version = 3,
+    version = 12,
     exportSchema = true,
 )
 abstract class PaceDatabase : RoomDatabase() {
     abstract fun activityDao(): ActivityDao
+    abstract fun activityAggregateDao(): ActivityAggregateDao
+    abstract fun savedRouteDao(): SavedRouteDao
     abstract fun trackPointDao(): TrackPointDao
     abstract fun splitDao(): SplitDao
     abstract fun sensorSampleDao(): SensorSampleDao
     abstract fun workoutDao(): WorkoutDao
     abstract fun goalDao(): GoalDao
     abstract fun mapPackDao(): MapPackDao
+    abstract fun homeWorkoutDraftDao(): HomeWorkoutDraftDao
     abstract fun syncOperationDao(): SyncOperationDao
+    abstract fun dailyStepsDao(): com.pace.app.data.local.dao.DailyStepsDao
 
     companion object {
         const val DATABASE_NAME = "pace_local.db"
@@ -112,6 +128,82 @@ abstract class PaceDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_3_4: Migration = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS activity_aggregate_cache (owner_id TEXT NOT NULL, period_key TEXT NOT NULL, sport TEXT NOT NULL, activity_count INTEGER NOT NULL, distance_meters INTEGER NOT NULL, moving_seconds INTEGER NOT NULL, elapsed_seconds INTEGER NOT NULL, refreshed_at_epoch_millis INTEGER NOT NULL, PRIMARY KEY(owner_id, period_key, sport))")
+            }
+        }
+
+        val MIGRATION_4_5: Migration = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS saved_routes (id TEXT NOT NULL PRIMARY KEY, title TEXT NOT NULL, notes TEXT, sport TEXT NOT NULL, distance_meters REAL NOT NULL, source_activity_id TEXT, created_at_epoch_millis INTEGER NOT NULL, updated_at_epoch_millis INTEGER NOT NULL, deleted_at_epoch_millis INTEGER, FOREIGN KEY(source_activity_id) REFERENCES activities(id) ON UPDATE NO ACTION ON DELETE SET NULL)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_saved_routes_updated_at ON saved_routes(updated_at_epoch_millis)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_saved_routes_deleted_at ON saved_routes(deleted_at_epoch_millis)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_saved_routes_source_activity ON saved_routes(source_activity_id)")
+                db.execSQL("CREATE TABLE IF NOT EXISTS saved_route_points (route_id TEXT NOT NULL, sequence INTEGER NOT NULL, latitude REAL NOT NULL, longitude REAL NOT NULL, altitude_meters REAL, segment_index INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(route_id, sequence), FOREIGN KEY(route_id) REFERENCES saved_routes(id) ON UPDATE NO ACTION ON DELETE CASCADE)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_saved_route_points_order ON saved_route_points(route_id, sequence)")
+            }
+        }
+
+        val MIGRATION_5_6: Migration = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE workout_templates ADD COLUMN target_duration_seconds INTEGER")
+                db.execSQL("ALTER TABLE workout_templates ADD COLUMN target_distance_meters REAL")
+            }
+        }
+
+        val MIGRATION_6_7: Migration = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE planned_sessions ADD COLUMN reminder_enabled INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val MIGRATION_7_8: Migration = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE sync_operations ADD COLUMN account_user_id TEXT NOT NULL DEFAULT 'local'")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_sync_operations_account_queue ON sync_operations(account_user_id, status, next_attempt_at_epoch_millis, sequence)")
+            }
+        }
+
+        /** Partition cloud-restored/local account data while retaining old rows in the local profile. */
+        val MIGRATION_8_9: Migration = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE workout_templates ADD COLUMN owner_id TEXT NOT NULL DEFAULT 'local'")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_workout_templates_owner_sport_updated_at ON workout_templates(owner_id, sport, updated_at_epoch_millis)")
+                db.execSQL("ALTER TABLE planned_sessions ADD COLUMN owner_id TEXT NOT NULL DEFAULT 'local'")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_planned_sessions_owner_scheduled_date ON planned_sessions(owner_id, scheduled_date)")
+                db.execSQL("ALTER TABLE goals ADD COLUMN owner_id TEXT NOT NULL DEFAULT 'local'")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_goals_owner_type_sport_range ON goals(owner_id, goal_type, sport, start_date, end_date)")
+                db.execSQL("ALTER TABLE personal_records ADD COLUMN owner_id TEXT NOT NULL DEFAULT 'local'")
+                db.execSQL("ALTER TABLE personal_records ADD COLUMN updated_at_epoch_millis INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("UPDATE personal_records SET updated_at_epoch_millis = achieved_at_epoch_millis")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_personal_records_owner_lookup ON personal_records(owner_id, sport, metric, distance_meters, achieved_at_epoch_millis)")
+                db.execSQL("ALTER TABLE saved_routes ADD COLUMN owner_id TEXT NOT NULL DEFAULT 'local'")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_saved_routes_owner_updated_at ON saved_routes(owner_id, updated_at_epoch_millis)")
+            }
+        }
+
+        val MIGRATION_9_10: Migration = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS home_workout_drafts (owner_id TEXT NOT NULL PRIMARY KEY, blocks_json TEXT NOT NULL, circuit_repeats INTEGER NOT NULL, rest_seconds INTEGER NOT NULL, session_started_at_epoch_millis INTEGER NOT NULL, step_index INTEGER NOT NULL, remaining_step_millis INTEGER NOT NULL, elapsed_active_millis INTEGER NOT NULL, paused INTEGER NOT NULL, finished INTEGER NOT NULL, updated_at_epoch_millis INTEGER NOT NULL)")
+            }
+        }
+
+        val MIGRATION_10_11: Migration = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS daily_steps (id INTEGER NOT NULL PRIMARY KEY, day TEXT NOT NULL, count INTEGER NOT NULL, sensorCount INTEGER NOT NULL, bootCount INTEGER NOT NULL)")
+            }
+        }
+
+        val MIGRATION_11_12: Migration = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE daily_steps_history (day TEXT NOT NULL PRIMARY KEY, count INTEGER NOT NULL, sensorCount INTEGER NOT NULL, bootCount INTEGER NOT NULL, updatedAt INTEGER NOT NULL)")
+                db.execSQL("INSERT INTO daily_steps_history SELECT day, count, sensorCount, bootCount, 0 FROM daily_steps")
+                db.execSQL("DROP TABLE daily_steps")
+                db.execSQL("ALTER TABLE daily_steps_history RENAME TO daily_steps")
+            }
+        }
+
         fun create(context: Context): PaceDatabase = Room.databaseBuilder(
             context.applicationContext,
             PaceDatabase::class.java,
@@ -119,6 +211,15 @@ abstract class PaceDatabase : RoomDatabase() {
         )
             .addMigrations(MIGRATION_1_2)
             .addMigrations(MIGRATION_2_3)
+            .addMigrations(MIGRATION_3_4)
+            .addMigrations(MIGRATION_4_5)
+            .addMigrations(MIGRATION_5_6)
+            .addMigrations(MIGRATION_6_7)
+            .addMigrations(MIGRATION_7_8)
+            .addMigrations(MIGRATION_8_9)
+            .addMigrations(MIGRATION_9_10)
+            .addMigrations(MIGRATION_10_11)
+            .addMigrations(MIGRATION_11_12)
             .build()
     }
 }

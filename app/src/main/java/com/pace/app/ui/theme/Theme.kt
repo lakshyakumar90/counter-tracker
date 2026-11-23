@@ -35,7 +35,7 @@ private val LightExtendedColors = PaceExtendedColors(
     warning = Warning, onWarning = Ink, warningContainer = WarningContainer,
     error = Error, onError = SurfaceWhite, errorContainer = ErrorContainer,
     information = Information, informationContainer = InformationContainer,
-    route = RouteBlue, compare = CompareViolet, routeSecondary = RouteGreen,
+    route = RouteGreen, compare = CompareViolet, routeSecondary = RouteBlue,
     routeTertiary = RouteOrange, routeQuaternary = RouteRed,
 )
 
@@ -44,26 +44,35 @@ private val DarkExtendedColors = PaceExtendedColors(
     warning = DarkWarning, onWarning = DarkField, warningContainer = DarkWarningContainer,
     error = DarkError, onError = DarkField, errorContainer = DarkErrorContainer,
     information = DarkInformation, informationContainer = DarkInformationContainer,
-    route = DarkRouteBlue, compare = DarkCompareViolet, routeSecondary = DarkRouteGreen,
+    route = DarkRouteGreen, compare = DarkCompareViolet, routeSecondary = DarkRouteBlue,
     routeTertiary = DarkRouteOrange, routeQuaternary = DarkRouteRed,
 )
 
 private val LocalPaceColors = staticCompositionLocalOf { LightExtendedColors }
+val LocalReducedMotion = staticCompositionLocalOf { false }
 
 val MaterialTheme.paceColors: PaceExtendedColors
     @Composable get() = LocalPaceColors.current
 
 private val LightScheme = lightColorScheme(
-    primary = River, onPrimary = SurfaceWhite, primaryContainer = Color(0xFFD7E9E9), onPrimaryContainer = Ink,
-    secondary = QuietText, onSecondary = SurfaceWhite, secondaryContainer = Color(0xFFE0E9E7), onSecondaryContainer = Ink,
-    tertiary = SignalAmber, onTertiary = Ink, background = FieldPaper, onBackground = Ink,
-    surface = SurfaceWhite, onSurface = Ink, surfaceVariant = Color(0xFFE5ECE9), onSurfaceVariant = QuietText,
-    outline = Color(0xFF7B8E8F), outlineVariant = Color(0xFFD0DAD7), error = Error, onError = SurfaceWhite,
+    primary = Color(0xFF5C36A1), onPrimary = SurfaceWhite,
+    primaryContainer = Color(0xFFEADDFF), onPrimaryContainer = Color(0xFF2A1749),
+    secondary = Color(0xFF635475), onSecondary = SurfaceWhite,
+    secondaryContainer = Color(0xFFEEE3FA), onSecondaryContainer = Color(0xFF2A2038),
+    tertiary = SignalAmber, onTertiary = Ink,
+    background = Color(0xFFF7F2FC), onBackground = Color(0xFF241B32),
+    surface = Color(0xFFFFFAFF), onSurface = Color(0xFF241B32),
+    surfaceVariant = Color(0xFFECE3F4), onSurfaceVariant = Color(0xFF463652),
+    outline = Color(0xFF6C587D), outlineVariant = Color(0xFFC5B3D5),
+    surfaceContainerLowest = Color.White, surfaceContainerLow = Color(0xFFF9F4FD),
+    surfaceContainer = Color(0xFFF3EAF9), surfaceContainerHigh = Color(0xFFECE2F5),
+    surfaceContainerHighest = Color(0xFFE6DAF0),
+    error = Error, onError = SurfaceWhite,
     errorContainer = ErrorContainer, onErrorContainer = Color(0xFF410E0B),
 )
 
 private val DarkScheme = darkColorScheme(
-    primary = DarkRiver, onPrimary = DarkField, primaryContainer = Color(0xFF294A50), onPrimaryContainer = DarkInk,
+    primary = Color(0xFFD3BCFF), onPrimary = DarkField, primaryContainer = Color(0xFF493270), onPrimaryContainer = DarkInk,
     secondary = DarkQuiet, onSecondary = DarkField, secondaryContainer = Color(0xFF34484B), onSecondaryContainer = DarkInk,
     tertiary = DarkAmber, onTertiary = DarkField, background = DarkField, onBackground = DarkInk,
     surface = DarkSurface, onSurface = DarkInk, surfaceVariant = Color(0xFF34484B), onSurfaceVariant = DarkQuiet,
@@ -71,14 +80,36 @@ private val DarkScheme = darkColorScheme(
     errorContainer = DarkErrorContainer, onErrorContainer = Color(0xFFFFDAD5),
 )
 
+private val LightHighContrastScheme = LightScheme.copy(
+    primary = Color(0xFF482781), onPrimary = Color.White, secondary = Color(0xFF263A3C),
+    onSurface = Color(0xFF101717), onSurfaceVariant = Color(0xFF263536), outline = Color(0xFF3D4A4B),
+    outlineVariant = Color(0xFF687576),
+)
+
+private val DarkHighContrastScheme = DarkScheme.copy(
+    primary = Color(0xFFEBDDFF), onPrimary = Color(0xFF002E2B), secondary = Color(0xFFE5FFFF),
+    onSurface = Color(0xFFFFFFFF), onSurfaceVariant = Color(0xFFE1F0EF), outline = Color(0xFFB8CDCC),
+    outlineVariant = Color(0xFF91A6A5),
+)
+
 @Composable
 fun PaceTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    highContrast: Boolean = false,
+    reducedMotion: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    CompositionLocalProvider(LocalPaceColors provides if (darkTheme) DarkExtendedColors else LightExtendedColors) {
+    CompositionLocalProvider(
+        LocalPaceColors provides if (darkTheme) DarkExtendedColors else LightExtendedColors,
+        LocalReducedMotion provides reducedMotion,
+    ) {
         MaterialTheme(
-            colorScheme = if (darkTheme) DarkScheme else LightScheme,
+            colorScheme = when {
+                darkTheme && highContrast -> DarkHighContrastScheme
+                darkTheme -> DarkScheme
+                highContrast -> LightHighContrastScheme
+                else -> LightScheme
+            },
             typography = PaceTypography,
             shapes = PaceShapes,
             content = content,

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/pace_step_widget"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/pace_step_widget_background"
+    android:gravity="center_vertical"
+    android:orientation="vertical"
+    android:padding="16dp">
+    <TextView
+        android:id="@+id/pace_step_value"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxLines="1"
+        android:text="@string/pace_steps_widget_initial"
+        android:textColor="#2A1749"
+        android:textSize="28sp"
+        android:textStyle="bold" />
+    <TextView
+        android:id="@+id/pace_step_label"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/pace_steps_today"
+        android:textColor="#463652"
+        android:textSize="14sp" />
+    <TextView
+        android:id="@+id/pace_step_estimates"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="#463652"
+        android:textSize="12sp" />
+</LinearLayout>

@@ -34,6 +34,57 @@ data class ActivityEntity(
     @ColumnInfo(name = "deleted_at_epoch_millis") val deletedAtEpochMillis: Long? = null,
 )
 
+/** Rebuildable UTC-week summary cache; Room activities remain the source of truth. */
+@Entity(tableName = "activity_aggregate_cache", primaryKeys = ["owner_id", "period_key", "sport"])
+data class ActivityAggregateCacheEntity(
+    @ColumnInfo(name = "owner_id") val ownerId: String,
+    @ColumnInfo(name = "period_key") val periodKey: String,
+    val sport: String,
+    @ColumnInfo(name = "activity_count") val activityCount: Int,
+    @ColumnInfo(name = "distance_meters") val distanceMeters: Long,
+    @ColumnInfo(name = "moving_seconds") val movingSeconds: Long,
+    @ColumnInfo(name = "elapsed_seconds") val elapsedSeconds: Long,
+    @ColumnInfo(name = "refreshed_at_epoch_millis") val refreshedAtEpochMillis: Long,
+)
+
+@Entity(
+    tableName = "saved_routes",
+    indices = [
+        Index(value = ["updated_at_epoch_millis"], name = "index_saved_routes_updated_at"),
+        Index(value = ["owner_id", "updated_at_epoch_millis"], name = "index_saved_routes_owner_updated_at"),
+        Index(value = ["deleted_at_epoch_millis"], name = "index_saved_routes_deleted_at"),
+        Index(value = ["source_activity_id"], name = "index_saved_routes_source_activity"),
+    ],
+    foreignKeys = [ForeignKey(entity = ActivityEntity::class, parentColumns = ["id"], childColumns = ["source_activity_id"], onDelete = ForeignKey.SET_NULL)],
+)
+data class SavedRouteEntity(
+    @PrimaryKey val id: String,
+    val title: String,
+    val notes: String? = null,
+    val sport: String,
+    @ColumnInfo(name = "distance_meters") val distanceMeters: Double,
+    @ColumnInfo(name = "source_activity_id") val sourceActivityId: String? = null,
+    @ColumnInfo(name = "created_at_epoch_millis") val createdAtEpochMillis: Long,
+    @ColumnInfo(name = "updated_at_epoch_millis") val updatedAtEpochMillis: Long,
+    @ColumnInfo(name = "deleted_at_epoch_millis") val deletedAtEpochMillis: Long? = null,
+    @ColumnInfo(name = "owner_id", defaultValue = "'local'") val ownerId: String = "local",
+)
+
+@Entity(
+    tableName = "saved_route_points",
+    primaryKeys = ["route_id", "sequence"],
+    foreignKeys = [ForeignKey(entity = SavedRouteEntity::class, parentColumns = ["id"], childColumns = ["route_id"], onDelete = ForeignKey.CASCADE)],
+    indices = [Index(value = ["route_id", "sequence"], name = "index_saved_route_points_order")],
+)
+data class SavedRoutePointEntity(
+    @ColumnInfo(name = "route_id") val routeId: String,
+    val sequence: Int,
+    val latitude: Double,
+    val longitude: Double,
+    @ColumnInfo(name = "altitude_meters") val altitudeMeters: Double? = null,
+    @ColumnInfo(name = "segment_index", defaultValue = "0") val segmentIndex: Int = 0,
+)
+
 /** Coordinates are stored privately in the app sandbox; never log these values. */
 @Entity(
     tableName = "track_points",
@@ -109,16 +160,22 @@ data class SensorSampleEntity(
 
 @Entity(
     tableName = "workout_templates",
-    indices = [Index(value = ["sport", "updated_at_epoch_millis"], name = "index_workout_templates_sport_updated")],
+    indices = [
+        Index(value = ["sport", "updated_at_epoch_millis"], name = "index_workout_templates_sport_updated"),
+        Index(value = ["owner_id", "sport", "updated_at_epoch_millis"], name = "index_workout_templates_owner_sport_updated_at"),
+    ],
 )
 data class WorkoutTemplateEntity(
     @PrimaryKey val id: String,
     val name: String,
     val sport: String,
     val description: String? = null,
+    @ColumnInfo(name = "target_duration_seconds") val targetDurationSeconds: Long? = null,
+    @ColumnInfo(name = "target_distance_meters") val targetDistanceMeters: Double? = null,
     @ColumnInfo(name = "created_at_epoch_millis") val createdAtEpochMillis: Long,
     @ColumnInfo(name = "updated_at_epoch_millis") val updatedAtEpochMillis: Long,
     @ColumnInfo(name = "deleted_at_epoch_millis") val deletedAtEpochMillis: Long? = null,
+    @ColumnInfo(name = "owner_id", defaultValue = "'local'") val ownerId: String = "local",
 )
 
 @Entity(
@@ -163,6 +220,7 @@ data class WorkoutIntervalEntity(
     ],
     indices = [
         Index(value = ["scheduled_date"], name = "index_planned_sessions_scheduled_date"),
+        Index(value = ["owner_id", "scheduled_date"], name = "index_planned_sessions_owner_scheduled_date"),
         Index(value = ["template_id"], name = "index_planned_sessions_template_id"),
         Index(value = ["completed_activity_id"], name = "index_planned_sessions_completed_activity_id"),
     ],
@@ -172,17 +230,20 @@ data class PlannedSessionEntity(
     @ColumnInfo(name = "template_id") val templateId: String? = null,
     @ColumnInfo(name = "scheduled_date") val scheduledDate: String,
     @ColumnInfo(name = "time_zone_id") val timeZoneId: String,
+    @ColumnInfo(name = "reminder_enabled", defaultValue = "0") val reminderEnabled: Boolean = false,
     @ColumnInfo(defaultValue = "'PLANNED'") val status: String = "PLANNED",
     @ColumnInfo(name = "completed_activity_id") val completedActivityId: String? = null,
     val notes: String? = null,
     @ColumnInfo(name = "updated_at_epoch_millis") val updatedAtEpochMillis: Long,
     @ColumnInfo(name = "deleted_at_epoch_millis") val deletedAtEpochMillis: Long? = null,
+    @ColumnInfo(name = "owner_id", defaultValue = "'local'") val ownerId: String = "local",
 )
 
 @Entity(
     tableName = "goals",
     indices = [
         Index(value = ["goal_type", "sport", "start_date", "end_date"], name = "index_goals_type_sport_range"),
+        Index(value = ["owner_id", "goal_type", "sport", "start_date", "end_date"], name = "index_goals_owner_type_sport_range"),
         Index(value = ["deleted_at_epoch_millis"], name = "index_goals_deleted_at"),
     ],
 )
@@ -197,6 +258,7 @@ data class GoalEntity(
     @ColumnInfo(name = "created_at_epoch_millis") val createdAtEpochMillis: Long,
     @ColumnInfo(name = "updated_at_epoch_millis") val updatedAtEpochMillis: Long,
     @ColumnInfo(name = "deleted_at_epoch_millis") val deletedAtEpochMillis: Long? = null,
+    @ColumnInfo(name = "owner_id", defaultValue = "'local'") val ownerId: String = "local",
 )
 
 @Entity(
@@ -211,6 +273,7 @@ data class GoalEntity(
     ],
     indices = [
         Index(value = ["sport", "metric", "distance_meters", "achieved_at_epoch_millis"], name = "index_personal_records_best_lookup"),
+        Index(value = ["owner_id", "sport", "metric", "distance_meters", "achieved_at_epoch_millis"], name = "index_personal_records_owner_lookup"),
         Index(value = ["activity_id"], name = "index_personal_records_activity_id"),
     ],
 )
@@ -225,6 +288,8 @@ data class PersonalRecordEntity(
     @ColumnInfo(name = "activity_id") val activityId: String? = null,
     val provenance: String,
     @ColumnInfo(name = "deleted_at_epoch_millis") val deletedAtEpochMillis: Long? = null,
+    @ColumnInfo(name = "owner_id", defaultValue = "'local'") val ownerId: String = "local",
+    @ColumnInfo(name = "updated_at_epoch_millis", defaultValue = "0") val updatedAtEpochMillis: Long = 0,
 )
 
 @Entity(
@@ -250,17 +315,34 @@ data class MapPackMetadataEntity(
     @ColumnInfo(name = "updated_at_epoch_millis") val updatedAtEpochMillis: Long,
 )
 
+@Entity(tableName = "home_workout_drafts")
+data class HomeWorkoutDraftEntity(
+    @PrimaryKey @ColumnInfo(name = "owner_id") val ownerId: String,
+    @ColumnInfo(name = "blocks_json") val blocksJson: String,
+    @ColumnInfo(name = "circuit_repeats") val circuitRepeats: Int,
+    @ColumnInfo(name = "rest_seconds") val restSeconds: Int,
+    @ColumnInfo(name = "session_started_at_epoch_millis") val sessionStartedAtEpochMillis: Long,
+    @ColumnInfo(name = "step_index") val stepIndex: Int,
+    @ColumnInfo(name = "remaining_step_millis") val remainingStepMillis: Long,
+    @ColumnInfo(name = "elapsed_active_millis") val elapsedActiveMillis: Long,
+    @ColumnInfo(name = "paused") val paused: Boolean,
+    @ColumnInfo(name = "finished") val finished: Boolean,
+    @ColumnInfo(name = "updated_at_epoch_millis") val updatedAtEpochMillis: Long,
+)
+
 @Entity(
     tableName = "sync_operations",
     indices = [
         Index(value = ["status", "next_attempt_at_epoch_millis", "sequence"], name = "index_sync_operations_queue_order"),
         Index(value = ["entity_type", "entity_id"], name = "index_sync_operations_entity"),
+        Index(value = ["account_user_id", "status", "next_attempt_at_epoch_millis", "sequence"], name = "index_sync_operations_account_queue"),
     ],
 )
 data class SyncOperationEntity(
     @PrimaryKey val id: String,
     @ColumnInfo(name = "entity_type") val entityType: String,
     @ColumnInfo(name = "entity_id") val entityId: String,
+    @ColumnInfo(name = "account_user_id", defaultValue = "'local'") val accountUserId: String = "local",
     @ColumnInfo(name = "operation_type") val operationType: String,
     /** Summary metadata only; exact coordinates belong in the separately protected track store. */
     val payload: String,

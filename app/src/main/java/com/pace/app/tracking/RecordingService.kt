@@ -20,22 +20,32 @@ import com.pace.app.R
 import com.pace.app.data.local.entity.ActivityEntity
 import com.pace.app.data.local.entity.SplitEntity
 import com.pace.app.data.local.entity.TrackPointEntity
+import com.pace.app.domain.metrics.ActivityMetrics
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.UUID
 
 class RecordingService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val database by lazy { (application as PaceApplication).container.database }
+    private val container by lazy { (application as PaceApplication).container }
+    private val database by lazy { container.database }
+    private val currentOwnerId get() = container.currentOwnerId()
     private var source: LocationSource? = null
     @Volatile private var activity: ActivityEntity? = null
     private var filter: TrackSampleFilter? = null
+    private var distanceGate: TrackDistanceGate? = null
+    private var distancePathId = 0
     private var sequence = 0
     private var segmentIndex = 0
     private var distanceRemainderMeters = 0.0
@@ -44,6 +54,7 @@ class RecordingService : Service() {
     private var segmentStartedAtMillis = 0L
     private var elapsedBeforeSegmentSeconds = 0L
     private val sampleMutex = Mutex()
+    private var acquisition: Job? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -51,7 +62,14 @@ class RecordingService : Service() {
         val notificationId = intent?.getStringExtra(EXTRA_ACTIVITY_ID)
         startForeground(NOTIFICATION_ID, notification("Pace", "Preparing local recording", paused = false))
         when (intent?.action) {
-            ACTION_START -> begin(intent.getStringExtra(EXTRA_SPORT) ?: "RUNNING", notificationId ?: UUID.randomUUID().toString())
+            ACTION_START -> if (acquisition?.isActive != true && activity == null) {
+                acquisitionState.value = Acquisition.Waiting
+                acquisition = begin(intent.getStringExtra(EXTRA_SPORT) ?: "RUNNING", notificationId ?: UUID.randomUUID().toString())
+            }
+            ACTION_CANCEL_ACQUISITION -> if (acquisitionState.compareAndSet(Acquisition.Waiting, Acquisition.Idle)) {
+                acquisition?.cancel()
+                stopSelf()
+            }
             ACTION_RESUME -> resume(notificationId)
             ACTION_PAUSE -> pause()
             ACTION_FINISH -> finish(intent.getStringExtra(EXTRA_TITLE))
@@ -62,16 +80,28 @@ class RecordingService : Service() {
     }
 
     private fun begin(sport: String, id: String) = scope.launch {
+        val firstFix = CompletableDeferred<TrackSample>()
+        val acquisitionFilter = TrackSampleFilter(sportMaximumSpeed(sport))
+        startLocation(sport) { sample ->
+            if (activity != null) saveSample(sample)
+            else if (isFreshRecordingFix(sample, System.currentTimeMillis()) && acquisitionFilter.accept(sample)) firstFix.complete(sample)
+        }
+        val fix = withTimeoutOrNull(60_000L) { firstFix.await() }
+        if (fix == null) {
+            if (!acquisitionState.compareAndSet(Acquisition.Waiting, Acquisition.TimedOut)) return@launch
+            stopSelf()
+            return@launch
+        }
+        if (!acquisitionState.compareAndSet(Acquisition.Waiting, Acquisition.Starting)) return@launch
         val now = System.currentTimeMillis()
         val entity = ActivityEntity(
-            id = id, sport = sport, status = "RECORDING", startedAtEpochMillis = now,
+            id = id, ownerId = currentOwnerId, sport = sport, status = "RECORDING", startedAtEpochMillis = now,
             title = defaultActivityTitle(sport, now),
             createdAtEpochMillis = now, updatedAtEpochMillis = now,
         )
         database.withTransaction {
             database.activityDao().upsert(entity)
         }
-        activity = entity
         isRunning = true
         sequence = 0
         segmentIndex = 0
@@ -80,12 +110,16 @@ class RecordingService : Service() {
         segmentStartedAtMillis = now
         elapsedBeforeSegmentSeconds = 0
         filter = TrackSampleFilter(sportMaximumSpeed(sport))
-        startLocation(sport)
+        distanceGate = TrackDistanceGate().also { it.reset() }
+        distancePathId = segmentIndex
+        activity = entity
+        acquisitionState.value = Acquisition.Idle
+        saveSample(fix)
         updateNotification(entity, paused = false)
     }
 
     private fun resume(id: String?) = scope.launch {
-        val existing = id?.let { database.activityDao().getById(it) } ?: database.activityDao().getActiveRecording()
+        val existing = id?.let { database.activityDao().getById(it, currentOwnerId) } ?: database.activityDao().getActiveRecording(currentOwnerId)
         if (existing == null) { stopSelf(); return@launch }
         activity = existing
         sequence = database.trackPointDao().countForActivity(existing.id)
@@ -105,12 +139,14 @@ class RecordingService : Service() {
         isRunning = true
         pausedAtMillis = null
         filter = TrackSampleFilter(sportMaximumSpeed(existing.sport))
+        distanceGate = TrackDistanceGate().also { it.reset() }
+        distancePathId = segmentIndex
         startLocation(existing.sport)
         updateNotification(resumed, paused = false)
     }
 
     private fun pause() = scope.launch {
-        val current = activity ?: database.activityDao().getActiveRecording() ?: return@launch
+        val current = activity ?: database.activityDao().getActiveRecording(currentOwnerId) ?: return@launch
         activity = current.copy(status = "PAUSED")
         source?.stop()
         source = null
@@ -129,7 +165,7 @@ class RecordingService : Service() {
     }
 
     private fun finish(finalTitle: String? = null) = scope.launch {
-        val current = activity ?: database.activityDao().getActiveRecording() ?: return@launch
+        val current = activity ?: database.activityDao().getActiveRecording(currentOwnerId) ?: return@launch
         if (activity == null) {
             elapsedBeforeSegmentSeconds = current.elapsedSeconds
             segmentStartedAtMillis = System.currentTimeMillis()
@@ -145,7 +181,7 @@ class RecordingService : Service() {
         val flags = withPausedMillis(current.dataQualityFlags, finalPaused, null)
         val saved = current.copy(
             status = "SAVED", endedAtEpochMillis = now, elapsedSeconds = elapsedSeconds,
-            movingSeconds = elapsedSeconds,
+            movingSeconds = ActivityMetrics.movingSeconds(elapsedSeconds, finalPaused / 1_000),
             title = finalTitle?.trim()?.takeIf(String::isNotEmpty) ?: current.title,
             dataQualityFlags = flags, updatedAtEpochMillis = now,
         )
@@ -166,7 +202,7 @@ class RecordingService : Service() {
 
     private fun updateTitle(title: String?) = scope.launch {
         sampleMutex.withLock {
-            val current = activity ?: database.activityDao().getActiveRecording() ?: return@withLock
+            val current = activity ?: database.activityDao().getActiveRecording(currentOwnerId) ?: return@withLock
             val updated = current.copy(title = title?.trim()?.takeIf(String::isNotEmpty), updatedAtEpochMillis = System.currentTimeMillis())
             database.activityDao().upsert(updated)
             activity = updated
@@ -174,11 +210,11 @@ class RecordingService : Service() {
     }
 
     private fun discard() = scope.launch {
-        val current = activity ?: database.activityDao().getActiveRecording() ?: return@launch
+        val current = activity ?: database.activityDao().getActiveRecording(currentOwnerId) ?: return@launch
         source?.stop()
         source = null
         sampleMutex.withLock {
-            database.withTransaction { database.activityDao().discardInProgress(current.id) }
+            database.withTransaction { database.activityDao().discardInProgress(current.id, current.ownerId) }
             activity = null
             isRunning = false
         }
@@ -186,7 +222,7 @@ class RecordingService : Service() {
         stopSelf()
     }
 
-    private fun startLocation(sport: String) {
+    private fun startLocation(sport: String, onSample: (TrackSample) -> Unit = ::saveSample) {
         if (!hasLocationPermission()) {
             updateNotification(activity, paused = true, message = getString(R.string.pace_record_location_revoked))
             scope.launch {
@@ -201,7 +237,7 @@ class RecordingService : Service() {
         val locationSource = FallbackLocationSource(this)
         source = locationSource
         val interval = sportIntervalMillis(sport)
-        locationSource.start(interval, ::saveSample) {
+        locationSource.start(interval, onSample) {
             updateNotification(activity, paused = false, message = getString(R.string.pace_record_no_gps))
             if (!hasLocationPermission()) {
                 source?.stop()
@@ -229,8 +265,18 @@ class RecordingService : Service() {
                 val current = activity ?: return@withLock
                 if (current.status != "RECORDING") return@withLock
                 val previous = database.trackPointDao().lastForActivity(current.id)
-                val addedDistance = previous?.takeIf { it.segmentIndex == acceptedSegment }
-                    ?.let { haversineMeters(it.latitude, it.longitude, sample.latitude, sample.longitude) } ?: 0.0
+                val gate = distanceGate ?: TrackDistanceGate().also { distanceGate = it }
+                if (distancePathId != acceptedSegment) {
+                    gate.reset()
+                    distancePathId = acceptedSegment
+                }
+                val addedDistance = when {
+                    previous == null || previous.segmentIndex != acceptedSegment -> {
+                        gate.reset(sample)
+                        0.0
+                    }
+                    else -> gate.add(sample)
+                }
                 val exactDistance = distanceRemainderMeters + addedDistance
                 val wholeMeters = exactDistance.toLong()
                 distanceRemainderMeters = exactDistance - wholeMeters
@@ -310,6 +356,7 @@ class RecordingService : Service() {
         .distinct().joinToString(";")
 
     override fun onDestroy() {
+        if (acquisitionState.value != Acquisition.TimedOut) acquisitionState.value = Acquisition.Idle
         isRunning = false
         source?.stop()
         scope.cancel()
@@ -317,6 +364,13 @@ class RecordingService : Service() {
     }
 
     companion object {
+        private const val ACTION_CANCEL_ACQUISITION = "com.pace.app.record.CANCEL_ACQUISITION"
+        private val acquisitionState = MutableStateFlow(Acquisition.Idle)
+        val gpsAcquisition = acquisitionState.asStateFlow()
+
+        fun cancelAcquisition(context: Context) {
+            context.startService(Intent(context, RecordingService::class.java).setAction(ACTION_CANCEL_ACQUISITION))
+        }
         @Volatile var isRunning: Boolean = false
             private set
         const val ACTION_START = "com.pace.app.tracking.START"
@@ -359,6 +413,8 @@ class RecordingService : Service() {
             else -> "Running"
         }
     }
+
+    enum class Acquisition { Idle, Waiting, Starting, TimedOut }
 }
 
 private fun RecordingService.defaultActivityTitle(sport: String, epochMillis: Long): String {

@@ -27,7 +27,7 @@ class TrackSampleFilter(private val maximumSpeedMetersPerSecond: Double) {
     fun evaluate(sample: TrackSample): SampleDecision {
         if (sample.timestampEpochMillis <= 0L || !sample.latitude.isFinite() || !sample.longitude.isFinite()) return SampleDecision(false)
         if (sample.latitude !in -90.0..90.0 || sample.longitude !in -180.0..180.0) return SampleDecision(false)
-        if (sample.accuracyMeters != null && (!sample.accuracyMeters.isFinite() || sample.accuracyMeters <= 0f || sample.accuracyMeters > 100f)) return SampleDecision(false)
+        if (sample.accuracyMeters != null && (!sample.accuracyMeters.isFinite() || sample.accuracyMeters <= 0f || sample.accuracyMeters > MAXIMUM_ACCURACY_METERS)) return SampleDecision(false)
         val before = previous
         if (before != null) {
             val deltaMillis = sample.timestampEpochMillis - before.timestampEpochMillis
@@ -42,9 +42,70 @@ class TrackSampleFilter(private val maximumSpeedMetersPerSecond: Double) {
         previous = sample
         return SampleDecision(accepted = true)
     }
+
+    private companion object {
+        /**
+         * A fix worse than this is only useful for showing that we are still searching.
+         * Keeping it in the track would let Wi-Fi/cell drift inflate distance while standing still.
+         */
+        const val MAXIMUM_ACCURACY_METERS = 20f
+    }
+}
+
+/**
+ * Accumulates distance from an anchor instead of from every single fix.
+ *
+ * GPS coordinates wobble by several metres even when the phone is stationary. Summing every
+ * fix-to-fix hop turned 20-30 idle seconds into tens of metres. This gate only advances once the
+ * fix has moved further than the combined accuracy noise, so jitter is ignored while real motion
+ * still accumulates across several samples.
+ */
+class TrackDistanceGate(
+    private val minimumDistanceMeters: Double = 5.0,
+    private val accuracyFactor: Double = 1.0,
+) {
+    private var anchor: TrackSample? = null
+
+    fun reset(sample: TrackSample? = null) {
+        anchor = sample
+    }
+
+    /** Returns the metres travelled since the last accepted anchor, or 0 when within GPS noise. */
+    fun add(sample: TrackSample): Double {
+        val before = anchor
+        if (before == null) {
+            anchor = sample
+            return 0.0
+        }
+        val moved = haversineMeters(before.latitude, before.longitude, sample.latitude, sample.longitude)
+        if (!moved.isFinite()) return 0.0
+        val deltaMillis = sample.timestampEpochMillis - before.timestampEpochMillis
+        val impliedSpeed = if (deltaMillis > 0) moved / (deltaMillis / 1000.0) else 0.0
+        val speed = sample.speedMetersPerSecond?.takeIf { it.isFinite() }?.toDouble() ?: impliedSpeed
+
+        // Doppler or implied speed below minimum walking speed is treated as stationary.
+        // Importantly: do NOT update anchor to the drifted position while stationary,
+        // otherwise jumping anchor to extreme noise points causes jitter hops to accumulate.
+        if (speed < STATIONARY_SPEED_METERS_PER_SECOND) {
+            return 0.0
+        }
+        val accuracy = maxOf(before.accuracyMeters ?: 0f, sample.accuracyMeters ?: 0f)
+        val threshold = maxOf(minimumDistanceMeters, accuracy.toDouble() * accuracyFactor)
+        if (moved < threshold) return 0.0
+        anchor = sample
+        return moved
+    }
+
+    private companion object {
+        /** Anything slower than 0.6 m/s (~2.16 km/h) is treated as standing still. */
+        const val STATIONARY_SPEED_METERS_PER_SECOND = 0.6
+    }
 }
 
 data class SampleDecision(val accepted: Boolean, val startsNewSegment: Boolean = false)
+
+internal fun isFreshRecordingFix(sample: TrackSample, nowMillis: Long): Boolean =
+    sample.accuracyMeters != null && nowMillis - sample.timestampEpochMillis in 0L..10_000L
 
 fun haversineMeters(latitudeA: Double, longitudeA: Double, latitudeB: Double, longitudeB: Double): Double {
     val earthRadiusMeters = 6_371_000.0

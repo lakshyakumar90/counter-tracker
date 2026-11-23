@@ -38,7 +38,9 @@ class FusedLocationSource(context: Context) : LocationSource {
         }
         callback = updates
         val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, intervalMillis)
-            .setMinUpdateIntervalMillis(intervalMillis / 2)
+            .setMinUpdateIntervalMillis(intervalMillis)
+            .setMinUpdateDistanceMeters(3f)
+            .setMaxUpdateDelayMillis(intervalMillis * 2)
             .setWaitForAccurateLocation(false)
             .build()
         try {
@@ -63,13 +65,16 @@ class PlatformLocationSource(private val context: Context) : LocationSource {
         val hasFine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
         val hasCoarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
         if (!hasFine && !hasCoarse) { onUnavailable(); return }
-        val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+        // Only mix in the network provider when GPS is unavailable. Network fixes are often tens of
+        // metres off and were the main source of distance being added while standing still.
+        val preferred = if (hasFine) LocationManager.GPS_PROVIDER else LocationManager.NETWORK_PROVIDER
+        val providers = listOf(preferred, LocationManager.NETWORK_PROVIDER).distinct()
             .filter { runCatching { manager.isProviderEnabled(it) }.getOrDefault(false) }
         if (providers.isEmpty()) { onUnavailable(); return }
         val callback = LocationListener { onSample(it.toTrackSample()) }
         listener = callback
         try {
-            providers.forEach { manager.requestLocationUpdates(it, intervalMillis, 0f, callback, Looper.getMainLooper()) }
+            providers.forEach { manager.requestLocationUpdates(it, intervalMillis, 3f, callback, Looper.getMainLooper()) }
         } catch (_: SecurityException) {
             onUnavailable()
         }

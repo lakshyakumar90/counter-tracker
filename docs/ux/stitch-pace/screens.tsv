@@ -1,0 +1,81 @@
+001	splash	Pace	Launch
+002	welcome	Welcome	Welcome
+003	activity_setup	Choose your sports	Choose sports
+004	theme_choice	Appearance	Theme
+005	auth_hub	Your account	Auth hub
+006	sign_up	Create account	Register
+007	sign_in	Sign in	Sign in
+008	email_verification	Verify email	Verify email
+009	password_reset	Reset password	Reset password
+010	link_local_data	Link local data	Link data
+011	home_dashboard	Pace	Today
+012	home_week_strip	This week	Week strip
+013	sport_picker	Choose a sport	Sport picker
+014	cycling_preflight	Cycling	Ready	Cycling
+015	running_preflight	Running	Ready	Running
+016	jogging_preflight	Jogging	Ready	Jogging
+017	walking_preflight	Walking	Ready	Walking
+018	location_permission	Location access	Location
+019	active_recording_hud	Recording	Recording
+020	metrics_recording	Recording	Full metrics
+021	paused	Paused	Paused
+022	finish_confirmation	Finish recording	Finish confirmation
+023	interrupted_recovery	Recover recording	Recovery
+024	saved_success	Activity saved	Saved
+025	workout_summary_splits	Workout summary	Summary
+026	history	History	History
+027	history_filters	History filters	History filters
+028	activity_detail	Activity detail	Activity detail
+029	edit_activity	Edit activity	Edit activity
+030	delete_activity_confirmation	Delete activity	Delete activity
+031	split_breakdown	Splits	Splits
+032	route_map_detail	Route detail	Route detail
+033	offline_maps_routes	Pace	Maps
+034	map_download_start	Download map	Choose region
+035	map_download_progress	Download progress	Map download
+036	map_packs_manager	Downloaded maps	Regions
+037	saved_routes	Saved routes	Saved routes
+038	saved_route_detail	Riverside loop	Saved route detail
+039	manual_route_editor	Edit route	Route editor
+040	gpx_import_preview	Import route	GPX preview
+041	follow_saved_route	Follow route	Follow route
+042	insights_analytics	Pace	Insights
+043	distance_trend	Distance trend	Distance trend
+044	pace_speed_trend	Pace and speed	Pace speed
+045	elevation_analysis	Elevation	Elevation detail
+046	calendar_heatmap	Activity frequency	Heatmap
+047	personal_records	Personal records	Personal records
+048	goals_overview	Goals	Goals
+049	create_edit_goal	Edit goal	Edit goal
+050	month_calendar	Pace	Plan
+051	week_agenda	Week agenda	Week agenda
+052	template_gallery	Templates	Templates
+053	template_detail	Hill repeats	Template detail
+054	outdoor_workout_editor	Edit workout	Workout editor
+055	schedule_sheet	Schedule workout	Schedule
+056	exercise_library	Exercises	Exercise library
+057	exercise_detail	Bodyweight squat	Exercise detail
+058	workout_builder	Build workout	Workout builder
+059	home_workout_preflight	Ready to begin	Workout ready
+060	workout_player	Workout	Workout player
+061	workout_completion	Workout complete	Workout complete
+062	instant_workout_picker	Find a workout	Workout picker
+063	recommendations	Workout suggestions	Recommendations
+064	predictions	Race forecast	Forecast
+065	settings_home	Settings	Settings
+066	profile	Profile	Profile
+067	privacy_and_permissions	Privacy	Privacy review
+068	appearance_and_units	Appearance and units	Units and theme
+069	notifications	Notifications	Notifications
+070	local_storage	Storage	Storage
+071	cloud_backup_status	Backup	Sync status
+072	restore_wizard	Restore backup	Restore
+073	export_all_data	Export your data	Export data
+074	delete_account	Delete account	Delete account
+075	ai_opt_in	AI access	AI consent
+076	athlete_intelligence	Athlete Intelligence	Athlete Intelligence
+077	ai_detail	Training details	AI detail
+078	ai_suggested_workout	Suggested workout	AI workout
+079	diagnostics_and_help	Help	Help
+080	battery_restriction	Battery settings	Battery
+081	crash_report_consent	Crash reports	Crash reports

@@ -13,6 +13,10 @@
 
 OpenFreeMap's current [Terms of Service](https://openfreemap.org/tos/) permit app offline downloads up to 3,000 tiles or 50 MB per download, with no more than four parallel requests and a unique identifying User-Agent. Larger downloads require contacting the provider. The [service FAQ](https://openfreemap.org/) says commercial use is allowed and identifies the public service as free, but also says it has no SLA. The Terms permit discontinuation without notice. Downloaded regions therefore remain local and usable offline, while new downloads and refreshes may become unavailable if the public service changes.
 
+**Terms rechecked:** 2026-11-19 against the provider's page, last updated
+2026-10-14. The current public style endpoint requires no API key; usage still
+needs to follow the tile, attribution, User-Agent, and offline-pack limits above.
+
 The standard [OpenStreetMap Foundation tile service policy](https://operations.osmfoundation.org/policies/tiles/) is not the offline pack source: it prohibits bulk tile downloads and prefetch. Do not point MapLibre's pack downloader at `tile.openstreetmap.org`.
 
 MapTiler's [Android Offline Pack API](https://docs.maptiler.com/mobile-sdk/android/examples/offline-get-started/) offers another managed option, but its documented packs expire after 30 days and must be refreshed. It would also change the planned MapLibre renderer to the MapTiler SDK or require a separate MapTiler-compatible data license; it is not selected for the first implementation.
@@ -30,6 +34,8 @@ P08 begins with these conservative, **provisional** app limits:
 ## Privacy and fallback
 
 The initial map opens at a neutral default view and does not request the device location. If the user explicitly enables follow-my-location, the app may show the puck locally; it must not send GPS coordinates to the tile server. Tile requests necessarily reveal the requested tile coordinates and the network address to the public provider. Use a unique app User-Agent and do not include activity identifiers, account data, or route samples in tile requests.
+
+Add Area starts from the current map view. Tap a center and choose a 10, 20, or 30 km radius. MapLibre downloads the rectangular bounds around that circle. Pace chooses the highest detail level that fits the documented provider caps and displays the estimated storage before downloading. Actual bytes depend on the area and downloaded resources.
 
 First launch without a saved pack, provider failure, and panning beyond a saved region must show an explicit local fallback. A missing tile or map provider never blocks GPS recording. The map destination stays useful offline with the fallback and whatever local packs remain available.
 

@@ -1,0 +1,10 @@
+# These functions verify the Supabase access token themselves. Disabling the
+# gateway check allows browser CORS preflight requests (OPTIONS) without a JWT.
+[functions.delete-account]
+verify_jwt = false
+
+[functions.ai-consent]
+verify_jwt = false
+
+[functions.ai-insights]
+verify_jwt = false

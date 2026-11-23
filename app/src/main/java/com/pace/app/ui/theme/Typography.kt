@@ -7,12 +7,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
 private val UiFont = FontFamily.SansSerif
-private val MetricFont = FontFamily.Monospace
+private const val TabularFigures = "tnum"
 
 val PaceTypography = Typography(
-    displayLarge = TextStyle(fontFamily = MetricFont, fontWeight = FontWeight.Medium, fontSize = 56.sp, lineHeight = 64.sp, letterSpacing = (-1.5).sp),
-    displayMedium = TextStyle(fontFamily = MetricFont, fontWeight = FontWeight.Medium, fontSize = 44.sp, lineHeight = 52.sp, letterSpacing = (-1).sp),
-    displaySmall = TextStyle(fontFamily = MetricFont, fontWeight = FontWeight.Medium, fontSize = 36.sp, lineHeight = 44.sp),
+    displayLarge = TextStyle(fontFamily = UiFont, fontFeatureSettings = TabularFigures, fontWeight = FontWeight.Bold, fontSize = 56.sp, lineHeight = 64.sp, letterSpacing = (-1.5).sp),
+    displayMedium = TextStyle(fontFamily = UiFont, fontFeatureSettings = TabularFigures, fontWeight = FontWeight.Bold, fontSize = 44.sp, lineHeight = 52.sp, letterSpacing = (-1).sp),
+    displaySmall = TextStyle(fontFamily = UiFont, fontFeatureSettings = TabularFigures, fontWeight = FontWeight.Bold, fontSize = 36.sp, lineHeight = 44.sp),
     headlineLarge = TextStyle(fontFamily = UiFont, fontWeight = FontWeight.SemiBold, fontSize = 32.sp, lineHeight = 40.sp),
     headlineMedium = TextStyle(fontFamily = UiFont, fontWeight = FontWeight.SemiBold, fontSize = 28.sp, lineHeight = 36.sp),
     headlineSmall = TextStyle(fontFamily = UiFont, fontWeight = FontWeight.SemiBold, fontSize = 24.sp, lineHeight = 32.sp),

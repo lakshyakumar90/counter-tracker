@@ -1,12 +1,11 @@
 package com.pace.app
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performScrollTo
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.test.core.app.ApplicationProvider
@@ -39,30 +38,27 @@ class PaceShellOnboardingTest {
         composeRule.onNodeWithText("A private place for your training").assertIsDisplayed()
         composeRule.onNodeWithText("Skip setup").performClick()
 
-        composeRule.onNodeWithText("Your training, at your pace").assertIsDisplayed()
+        composeRule.onNodeWithText("Today").assertIsDisplayed()
         assert(runBlocking { container.settingsRepository.preferences.first().onboardingComplete })
     }
 
     @Test
-    fun onboardingPersistsSportUnitsThemeAndOptionalProfile() {
+    fun threeStepOnboardingPersistsSportAndUnits() {
         composeRule.onNodeWithText("Continue").performClick()
         composeRule.onNodeWithText("Choose your activities").assertIsDisplayed()
         composeRule.onNodeWithText("Cycling").performClick()
         composeRule.onNodeWithText("Continue").performClick()
         composeRule.onNodeWithText("Choose your units").assertIsDisplayed()
         composeRule.onNodeWithText("Imperial · mi, min/mi").performClick()
-        composeRule.onNodeWithText("Continue").performClick()
-        composeRule.onNodeWithText("Make Pace yours").assertIsDisplayed()
-        composeRule.onNodeWithText("Use device theme").performClick()
-        composeRule.onNodeWithText("Name (optional)").performTextInput("Lakshya")
+        composeRule.activityRule.scenario.recreate()
+        composeRule.onNodeWithText("Choose your units").assertIsDisplayed()
         composeRule.onNodeWithText("Use Pace locally").performClick()
 
-        composeRule.onNodeWithText("Your training, at your pace").assertIsDisplayed()
+        composeRule.onNodeWithText("Today").assertIsDisplayed()
         val stored = runBlocking { container.settingsRepository.preferences.first() }
         assert(stored.onboardingComplete)
         assert(stored.units == PaceUnits.Imperial)
-        assert(stored.theme == PaceThemeChoice.System)
-        assert("Lakshya" == stored.profileName)
+        assert(stored.theme == PaceThemeChoice.Light)
         assert(PaceSport.Cycling !in stored.preferredSports)
     }
 
@@ -70,18 +66,18 @@ class PaceShellOnboardingTest {
     fun selectedTabAndPreferencesSurviveActivityRecreation() {
         composeRule.onNodeWithText("Skip setup").performClick()
         composeRule.onNodeWithText("Insights").performClick()
-        composeRule.onNodeWithText("Record an activity to see local summaries and trends here.").assertIsDisplayed()
+        composeRule.onNodeWithText("Record an activity to see your trends.").assertIsDisplayed()
         composeRule.activityRule.scenario.recreate()
 
-        composeRule.onNodeWithText("Record an activity to see local summaries and trends here.").assertIsDisplayed()
+        composeRule.onNodeWithText("Record an activity to see your trends.").assertIsDisplayed()
         assert(runBlocking { container.settingsRepository.preferences.first().lastSelectedTab == "insights" })
     }
 
     @Test
-    fun planRemainsOutOfDefaultV1Navigation() {
+    fun planIsAvailableFromTheShell() {
         composeRule.onNodeWithText("Skip setup").performClick()
-        composeRule.onNodeWithText("Your training, at your pace").assertIsDisplayed()
-        composeRule.onAllNodesWithText("Plan").assertCountEquals(0)
+        composeRule.onNodeWithText("Today").assertIsDisplayed()
+        composeRule.onNodeWithText("Plan").assertIsDisplayed()
     }
 
     @Test
@@ -91,7 +87,7 @@ class PaceShellOnboardingTest {
 
         assert(!recovered.onboardingComplete)
         assert(recovered.units == PaceUnits.Metric)
-        assert(recovered.theme == PaceThemeChoice.System)
+        assert(recovered.theme == PaceThemeChoice.Light)
     }
 
     @Test
@@ -124,6 +120,10 @@ class PaceShellOnboardingTest {
         composeRule.onNodeWithText("Skip setup").performClick()
         composeRule.onNodeWithText("Record").performClick()
         composeRule.onNodeWithText("Record an activity").assertIsDisplayed()
+        composeRule.onNodeWithText("Start recording").assertIsDisplayed()
+        listOf("Cycling", "Running", "Jogging", "Walking").forEach { sport ->
+            composeRule.onNodeWithText(sport).performScrollTo().assertIsDisplayed()
+        }
         composeRule.onNodeWithText("Maps").performClick()
         composeRule.onNodeWithText("Map coverage is unavailable").assertIsDisplayed()
     }
@@ -131,12 +131,32 @@ class PaceShellOnboardingTest {
     @Test
     fun profileSettingsAreReachableFromTheShell() {
         composeRule.onNodeWithText("Skip setup").performClick()
-        composeRule.onNodeWithText("Profile and settings").performClick()
-        composeRule.onNodeWithText("Local profile · this device").assertIsDisplayed()
-        composeRule.onNodeWithText("No account is connected. Your local settings remain available offline.").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Profile and settings").performClick()
+        composeRule.onNodeWithText("Profile and settings").assertIsDisplayed()
         composeRule.activityRule.scenario.onActivity { activity ->
             activity.onBackPressedDispatcher.onBackPressed()
         }
-        composeRule.onNodeWithText("Your training, at your pace").assertIsDisplayed()
+        composeRule.onNodeWithText("Today").assertIsDisplayed()
+    }
+
+    @Test
+    fun systemBackFromHomeWorkoutsReturnsToHome() {
+        composeRule.onNodeWithText("Skip setup").performClick()
+        composeRule.onNodeWithText("Home workouts").performScrollTo().performClick()
+        composeRule.onNodeWithText("Build a workout").assertIsDisplayed()
+        composeRule.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+        composeRule.onNodeWithText("Today").assertIsDisplayed()
+    }
+
+    @Test
+    fun accountBackupEnablesForItsOwnerWithoutReplacingADifferentOwner() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val suffix = System.nanoTime().toString()
+        val repository = PaceSettingsRepository(context, "pace_backup_$suffix", "pace_legacy_$suffix")
+        repository.enableBackupForSignedInAccount("owner-one")
+        repository.enableBackupForSignedInAccount("owner-two")
+        val saved = repository.preferences.first()
+        assert(saved.backupEnabled)
+        assert(saved.backupOwnerUserId == "owner-one")
     }
 }

@@ -13,13 +13,38 @@
 
 See [the provider and storage decision](../platform/offline-map-provider.md).
 
-## Remaining work
+## Additional source implementation
 
-P08-T001 provider research, the initial T003 online map, and T005's packaged no-tile fallback are implemented. T002 budget is documented provisionally. Light/dark style switching and retry are implemented; T004's offline style-rendering acceptance still depends on offline packs. T006–T028 remain open: location puck/accuracy circle, segmented route drawing, camera controls, visible attribution verification, region selection and size estimation, background download progress/pause/resume, checksum/completeness checks, saved-region listing/deletion/update, and physical tests for offline rendering, storage, and recording independence.
+- Maps now uses MapLibre `OfflineManager`/`OfflineRegion` for app-private saved
+  areas. The Maps screen accepts named latitude/longitude bounds, estimates
+  tile count and size for zoom levels 10–15, checks free space, and enforces the
+  documented 3,000-tile/approximately-50-MB per-area and 150-MB total limits.
+- Downloaded bytes, bounds, native pack ID, status, and style version are
+  persisted in Room. The user can pause, resume, and confirm deletion; progress
+  shows completed tiles, resources, and actual bytes. Existing packs are never
+  evicted automatically. Native MapLibre stores the resources in its private
+  offline database.
+- The app identifies map requests with a Pace Android User-Agent and limits the
+  shared MapLibre HTTP client to four in-flight requests. When offline, the map
+  tries the cached Liberty style and leaves the non-geographic fallback visible
+  when the style is not available. Recording remains independent from tile data.
+- Added deterministic boundary/size-policy JVM tests.
+
+The region selector currently uses coordinate fields instead of a drawn map
+rectangle. Pack estimates are approximations; actual bytes are displayed and
+downloads pause on observed size-limit overrun. Process-death/resume behavior,
+provider attribution, offline labels/sprites, corruption handling, and pack
+deletion/space recovery still need phone verification. No custom checksum over
+MapLibre's native offline database is claimed.
 
 ## APK and device checks
 
-An APK is required now for the first native runtime checkpoint: verify that the map surface renders on the target phone, OpenFreeMap style/tiles load, attribution remains visible, map gestures work, lifecycle transitions do not blank/crash, the 12-second fallback appears without network, and recording remains independent of map loading. JVM tests and lint cannot establish those device behaviors. ADB reported no attached/authorized device on 2026-11-18, so APK packaging/installation is deferred until the physical phone is available; no emulator is to be installed.
+An APK is required for native runtime acceptance: verify online and cached offline
+map rendering, attribution, gestures, lifecycle, downloads, progress, pause/resume,
+storage limits, delete, and recording independence. JVM tests and lint cannot
+establish those behaviors. ADB reported no attached/authorized device on
+2026-11-18, so APK installation waits for the owner's physical phone; no
+emulator is to be installed.
 
 P08's offline-rendering gate remains Hold until an installed region renders with networking disabled, the no-pack fallback is visible, downloads respect the source/storage limits, and recording continues without map data.
 

@@ -62,12 +62,14 @@ private const val OPENFREEMAP_DARK_STYLE = "https://tiles.openfreemap.org/styles
 private const val MAP_LOAD_TIMEOUT_MILLIS = 12_000L
 private const val ROUTE_SOURCE_ID = "pace-recorded-route-source"
 private const val ROUTE_LAYER_ID = "pace-recorded-route-layer"
+private const val ROUTE_START_SOURCE_ID = "pace-route-start-source"
+private const val ROUTE_START_LAYER_ID = "pace-route-start-layer"
 private const val POSITION_SOURCE_ID = "pace-recorded-position-source"
 private const val ACCURACY_LAYER_ID = "pace-recorded-accuracy-layer"
 private const val POSITION_LAYER_ID = "pace-recorded-position-layer"
 
 /**
- * Online MapLibre view with an honest local fallback. This view never requests location;
+ * MapLibre view with an honest local fallback. This view never requests location;
  * recording and GPS collection remain owned by the recording flow/service.
  */
 @Composable
@@ -75,10 +77,21 @@ fun PaceMapPanel(
     darkTheme: Boolean,
     isOnline: Boolean,
     routePoints: List<TrackPointEntity> = emptyList(),
+    highlightedTrackPoint: TrackPointEntity? = null,
     followLocation: Boolean = false,
     fitRoute: Boolean = false,
     recenterKey: Int = 0,
+    reducedMotion: Boolean = false,
     modifier: Modifier = Modifier,
+    onMapTap: ((latitude: Double, longitude: Double) -> Unit)? = null,
+    selection: LatLng? = null,
+    selectionRadiusKm: Int = 10,
+    initialCamera: org.maplibre.android.camera.CameraPosition? = null,
+    onCameraIdle: ((org.maplibre.android.camera.CameraPosition) -> Unit)? = null,
+    locationJump: LatLng? = null,
+    locationJumpKey: Int = 0,
+    snapshotKey: Int = 0,
+    onSnapshot: ((android.graphics.Bitmap?) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -91,7 +104,15 @@ fun PaceMapPanel(
     var loadedStyle by remember { mutableStateOf<Style?>(null) }
     val mapView = remember(context) {
         MapLibre.getInstance(context)
-        MapView(context).apply {
+        object : MapView(context) {
+            override fun dispatchTouchEvent(event: android.view.MotionEvent): Boolean {
+                parent?.requestDisallowInterceptTouchEvent(
+                    event.actionMasked != android.view.MotionEvent.ACTION_UP &&
+                        event.actionMasked != android.view.MotionEvent.ACTION_CANCEL,
+                )
+                return super.dispatchTouchEvent(event)
+            }
+        }.apply {
             onCreate(null)
         }
     }
@@ -135,11 +156,11 @@ fun PaceMapPanel(
         requestGeneration = activeGeneration
         styleLoaded = false
         loadedStyle = null
-        loadTimedOut = !isOnline
-        if (!isOnline) return@LaunchedEffect
+        loadTimedOut = false
         mapView.getMapAsync { map ->
+            if (mapRef == null && initialCamera != null) map.cameraPosition = initialCamera
             mapRef = map
-            val styleUrl = if (darkTheme) OPENFREEMAP_DARK_STYLE else OPENFREEMAP_LIBERTY_STYLE
+            val styleUrl = if (isOnline && darkTheme) OPENFREEMAP_DARK_STYLE else OPENFREEMAP_LIBERTY_STYLE
             map.setStyle(styleUrl) { style ->
                 if (requestGeneration == activeGeneration && loadAttempt == activeAttempt) {
                     loadedStyle = style
@@ -149,6 +170,62 @@ fun PaceMapPanel(
         }
         delay(MAP_LOAD_TIMEOUT_MILLIS)
         if (!styleLoaded && requestGeneration == activeGeneration && loadAttempt == activeAttempt) loadTimedOut = true
+    }
+
+    LaunchedEffect(mapRef, locationJump, locationJumpKey) {
+        val position = locationJump ?: return@LaunchedEffect
+        mapRef?.moveCamera(CameraUpdateFactory.newLatLngZoom(position, 15.0))
+    }
+    val cameraIdle by androidx.compose.runtime.rememberUpdatedState(onCameraIdle)
+    DisposableEffect(mapRef, onCameraIdle != null) {
+        val map = mapRef
+        if (map == null || onCameraIdle == null) return@DisposableEffect onDispose { }
+        val listener = MapLibreMap.OnCameraIdleListener { cameraIdle?.invoke(map.cameraPosition) }
+        map.addOnCameraIdleListener(listener)
+        onDispose { map.removeOnCameraIdleListener(listener) }
+    }
+
+    val currentMapTap by androidx.compose.runtime.rememberUpdatedState(onMapTap)
+    val snapshotResult by androidx.compose.runtime.rememberUpdatedState(onSnapshot)
+    LaunchedEffect(snapshotKey) {
+        if (snapshotKey != 0) {
+            val map = mapRef
+            if (map != null && styleLoaded) map.snapshot { image -> snapshotResult?.invoke(image) }
+            else snapshotResult?.invoke(null)
+        }
+    }
+    DisposableEffect(mapRef, onMapTap != null) {
+        val map = mapRef
+        if (map == null || onMapTap == null) return@DisposableEffect onDispose { }
+        val listener = MapLibreMap.OnMapClickListener { tapped ->
+            currentMapTap?.invoke(tapped.latitude, tapped.longitude)
+            true
+        }
+        map.addOnMapClickListener(listener)
+        onDispose { map.removeOnMapClickListener(listener) }
+    }
+
+    LaunchedEffect(loadedStyle, selection, selectionRadiusKm, locationJump) {
+        val style = loadedStyle ?: return@LaunchedEffect
+        val picked = selection ?: locationJump ?: return@LaunchedEffect
+        val source = style.getSourceAs<GeoJsonSource>("pace-area-selection")
+            ?: GeoJsonSource("pace-area-selection").also {
+                style.addSource(it)
+                style.addLayer(FillLayer("pace-area-coverage", it.id).withProperties(
+                    PropertyFactory.fillColor("#7C3AED"),
+                    PropertyFactory.fillOpacity(.22f),
+                ))
+                style.addLayer(CircleLayer("pace-area-center", it.id).withProperties(
+                    PropertyFactory.circleColor("#7C3AED"),
+                    PropertyFactory.circleRadius(7f),
+                    PropertyFactory.circleStrokeColor("#FFFFFF"),
+                    PropertyFactory.circleStrokeWidth(2f),
+                ))
+            }
+        source.setGeoJson(FeatureCollection.fromFeatures(buildList {
+            if (selection != null) add(Feature.fromGeometry(accuracyPolygon(picked.latitude, picked.longitude, selectionRadiusKm * 1_000.0)))
+            add(Feature.fromGeometry(Point.fromLngLat(picked.longitude, picked.latitude)))
+        }))
     }
 
     LaunchedEffect(loadedStyle, routePoints, followLocation, fitRoute, recenterKey, darkTheme) {
@@ -172,6 +249,18 @@ fun PaceMapPanel(
             ))
         }
         routeSource.setGeoJson(FeatureCollection.fromFeatures(lines.map(Feature::fromGeometry)))
+
+        val startSource = style.getSourceAs<GeoJsonSource>(ROUTE_START_SOURCE_ID) ?: GeoJsonSource(ROUTE_START_SOURCE_ID).also { source ->
+            style.addSource(source)
+            style.addLayer(CircleLayer(ROUTE_START_LAYER_ID, ROUTE_START_SOURCE_ID).withProperties(
+                PropertyFactory.circleRadius(6f),
+                PropertyFactory.circleColor("#F5B942"),
+                PropertyFactory.circleStrokeColor("#FFFFFF"),
+                PropertyFactory.circleStrokeWidth(2f),
+            ))
+        }
+        val startPoint = routePoints.firstOrNull()?.let { Feature.fromGeometry(Point.fromLngLat(it.longitude, it.latitude)) }
+        startSource.setGeoJson(FeatureCollection.fromFeatures(if (startPoint == null) emptyList() else listOf(startPoint)))
 
         val positionSource = style.getSourceAs<GeoJsonSource>(POSITION_SOURCE_ID) ?: GeoJsonSource(POSITION_SOURCE_ID).also { source ->
             style.addSource(source)
@@ -199,14 +288,19 @@ fun PaceMapPanel(
         }
         positionSource.setGeoJson(FeatureCollection.fromFeatures(features))
         if (followLocation || recenterRequested) {
-            map.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(last.latitude, last.longitude), 16.0))
+            val position = LatLng(last.latitude, last.longitude)
+            val update = if (recenterRequested || routePoints.size == 1) CameraUpdateFactory.newLatLngZoom(position, 16.0)
+            else CameraUpdateFactory.newLatLng(position)
+            if (reducedMotion || !recenterRequested) map.moveCamera(update) else map.animateCamera(update)
         } else if (fitRoute && routePoints.size >= 2) {
             val bounds = LatLngBounds.Builder().apply {
                 routePoints.forEach { include(LatLng(it.latitude, it.longitude)) }
             }.build()
-            map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 48))
+            val update = CameraUpdateFactory.newLatLngBounds(bounds, 48)
+            if (reducedMotion) map.moveCamera(update) else map.animateCamera(update)
         } else if (routePoints.size == 1) {
-            map.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(last.latitude, last.longitude), 15.0))
+            val update = CameraUpdateFactory.newLatLngZoom(LatLng(last.latitude, last.longitude), 15.0)
+            if (reducedMotion) map.moveCamera(update) else map.animateCamera(update)
         }
     }
 
@@ -217,17 +311,17 @@ fun PaceMapPanel(
         tonalElevation = 1.dp,
     ) {
         Box(Modifier.fillMaxSize()) {
-            if (!styleLoaded) OfflineMapPlaceholder(darkTheme, routePoints, Modifier.fillMaxSize())
+            if (!styleLoaded) OfflineMapPlaceholder(darkTheme, routePoints, highlightedTrackPoint, Modifier.fillMaxSize())
             AndroidView(
                 factory = { mapView },
                 modifier = Modifier.fillMaxSize(),
-                update = { view: View -> view.visibility = if (styleLoaded && isOnline) View.VISIBLE else View.INVISIBLE },
+                update = { view: View -> view.visibility = if (styleLoaded) View.VISIBLE else View.INVISIBLE },
             )
-            if (!styleLoaded || !isOnline) {
+            if (!styleLoaded) {
                 MapUnavailableFallback(
                     modifier = Modifier.align(Alignment.Center),
                     loading = !loadTimedOut && isOnline,
-                    retryEnabled = isOnline,
+                    retryEnabled = true,
                     onRetry = { loadAttempt += 1 },
                 )
             }
@@ -240,6 +334,7 @@ fun PaceMapPanel(
 private fun OfflineMapPlaceholder(
     darkTheme: Boolean,
     routePoints: List<TrackPointEntity>,
+    highlightedTrackPoint: TrackPointEntity?,
     modifier: Modifier = Modifier,
 ) {
     val background = if (darkTheme) Color(0xFF172329) else Color(0xFFEAF0ED)
@@ -275,10 +370,11 @@ private fun OfflineMapPlaceholder(
             drawLine(secondaryRoad, start, end, strokeWidth = size.width * .012f, cap = StrokeCap.Round)
         }
         if (routePoints.isNotEmpty()) {
-            val minLatitude = routePoints.minOf { it.latitude }
-            val maxLatitude = routePoints.maxOf { it.latitude }
-            val minLongitude = routePoints.minOf { it.longitude }
-            val maxLongitude = routePoints.maxOf { it.longitude }
+            val projectionPoints = routePoints + listOfNotNull(highlightedTrackPoint)
+            val minLatitude = projectionPoints.minOf { it.latitude }
+            val maxLatitude = projectionPoints.maxOf { it.latitude }
+            val minLongitude = projectionPoints.minOf { it.longitude }
+            val maxLongitude = projectionPoints.maxOf { it.longitude }
             val latitudeSpan = (maxLatitude - minLatitude).coerceAtLeast(0.00001)
             val longitudeSpan = (maxLongitude - minLongitude).coerceAtLeast(0.00001)
             val padding = size.minDimension * .16f
@@ -299,6 +395,11 @@ private fun OfflineMapPlaceholder(
                 drawPath(path, routeColor, style = Stroke(width = size.minDimension * .018f, cap = StrokeCap.Round))
             }
             val last = routePoints.last()
+            val first = routePoints.first()
+            val startX = padding + (first.longitude - minLongitude).toFloat() * scale
+            val startY = size.height - padding - (first.latitude - minLatitude).toFloat() * scale
+            drawCircle(Color(0xFFF5B942), radius = size.minDimension * .022f, center = Offset(startX, startY))
+            drawCircle(Color.White, radius = size.minDimension * .013f, center = Offset(startX, startY))
             val x = padding + (last.longitude - minLongitude).toFloat() * scale
             val y = size.height - padding - (last.latitude - minLatitude).toFloat() * scale
             last.horizontalAccuracyMeters?.let { accuracy ->
@@ -307,6 +408,12 @@ private fun OfflineMapPlaceholder(
             }
             drawCircle(routeColor, radius = size.minDimension * .022f, center = Offset(x, y))
             drawCircle(Color.White, radius = size.minDimension * .013f, center = Offset(x, y))
+            highlightedTrackPoint?.let { point ->
+                val selectedX = padding + (point.longitude - minLongitude).toFloat() * scale
+                val selectedY = size.height - padding - (point.latitude - minLatitude).toFloat() * scale
+                drawCircle(Color(0xFFF1C56B), radius = size.minDimension * .035f, center = Offset(selectedX, selectedY))
+                drawCircle(Color(0xFF18343A), radius = size.minDimension * .015f, center = Offset(selectedX, selectedY))
+            }
         }
     }
 }

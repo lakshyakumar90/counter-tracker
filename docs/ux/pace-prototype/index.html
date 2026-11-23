@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pace · Android design preview</title>
+<link rel="stylesheet" href="pace.css">
+<body>
+<main class="studio">
+  <aside class="review">
+    <a class="brand" href="index.html">pace<span>.</span></a>
+    <h1>Android design preview</h1>
+    <p>Illustrative routes and metrics</p>
+    <label>Screen<select id="screens"></select></label>
+    <label>Prototype flow<select id="flows"></select></label>
+    <label>Theme<select id="themes"><option>Dark</option><option>Light</option><option>High contrast</option></select></label>
+    <label>Device<select id="devices"><option>Compact</option><option>Large phone</option><option>Landscape</option><option>Tablet</option></select></label>
+    <label>Data state<select id="states"></select></label>
+    <a href="design.md">Design and Compose notes</a>
+  </aside>
+  <section id="device" class="device" aria-label="Pace prototype">
+    <header id="toolbar"></header>
+    <article id="screen" tabindex="-1"></article>
+    <nav id="navigation" aria-label="Pace sections"></nav>
+  </section>
+</main>
+<script src="pace.js"></script>
+</body>
+</html>

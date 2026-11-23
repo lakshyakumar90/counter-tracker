@@ -1,6 +1,7 @@
 package com.pace.app.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
@@ -24,6 +25,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.material3.Icon
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -38,11 +41,13 @@ fun PacePrimaryButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     loading: Boolean = false,
+    icon: ImageVector? = null,
 ) {
     Button(
         onClick = onClick,
         modifier = modifier.widthIn(min = 48.dp),
         enabled = enabled && !loading,
+        contentPadding = if (icon == null) ButtonDefaults.ContentPadding else PaddingValues(horizontal = 12.dp, vertical = 8.dp),
         shape = androidx.compose.material3.MaterialTheme.shapes.medium,
         colors = ButtonDefaults.buttonColors(
             containerColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
@@ -56,6 +61,8 @@ fun PacePrimaryButton(
                     strokeWidth = 2.dp,
                     color = androidx.compose.material3.MaterialTheme.colorScheme.onPrimary,
                 )
+            } else if (icon != null) {
+                Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
             }
             Text(label)
         }
@@ -68,9 +75,18 @@ fun PaceSecondaryButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    icon: ImageVector? = null,
 ) {
-    OutlinedButton(onClick = onClick, modifier = modifier.widthIn(min = 48.dp), enabled = enabled) {
-        Text(label)
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier.widthIn(min = 48.dp),
+        enabled = enabled,
+        contentPadding = if (icon == null) ButtonDefaults.ContentPadding else PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (icon != null) Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+            Text(label)
+        }
     }
 }
 

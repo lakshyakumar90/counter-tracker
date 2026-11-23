@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import com.pace.app.R
 import com.pace.app.ui.theme.paceColors
+import com.pace.app.ui.theme.LocalReducedMotion
 import kotlinx.coroutines.launch
 
 @Composable
@@ -290,7 +291,8 @@ fun PaceNumericTransition(
     contentDescription: String,
 ) {
     val context = LocalContext.current
-    val animationsEnabled = remember(context) { systemAnimationsEnabled(context) }
+    val reducedMotion = LocalReducedMotion.current
+    val animationsEnabled = remember(context, reducedMotion) { systemAnimationsEnabled(context) && !reducedMotion }
     androidx.compose.animation.AnimatedContent(
         targetState = value,
         modifier = modifier.semantics { this.contentDescription = contentDescription },

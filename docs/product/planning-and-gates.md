@@ -122,6 +122,38 @@ installation and offline runtime checks are pending until it is connected. See
 [P08 progress](phase-8-completion.md) and the
 [provider/storage decision](../platform/offline-map-provider.md).
 
+## P10–P11 implementation checkpoint (2026-11-18)
+
+The Phase 10 history/detail source and Phase 11 deterministic metrics/cache
+source are implemented. Main Kotlin compilation, JVM fixture tests, Android-test
+source compilation, and lint pass. P10 device acceptance and P11 Room migration,
+incremental-cache, and full-rebuild runtime tests are still pending because the
+owner requested no APK packaging or device/USB validation. The detailed
+task-to-code and calculation evidence is in
+[P10–P11 progress](phase-10-11-progress.md) and the
+[analytics calculation contract](analytics-calculations.md). Keep both gates
+Hold until the pending runtime evidence is collected.
+
+## Phase 12 sequencing exception and evidence
+
+The owner directed implementation of the next phase while P10 physical-device
+acceptance and P11 Room instrumentation were still pending. Phase 12 was
+therefore implemented as a sequencing exception; this does not change either
+upstream gate or mark the P12 acceptance gate passed. See
+[Phase 12 progress](phase-12-progress.md) for implementation, code-check, and
+remaining chart/runtime acceptance evidence.
+
+## Phase 13 sequencing and cut-line exception
+
+The owner then directed proceeding to P13 while P10 device acceptance remains
+open and P13 is still classified V1.1 in the P00 cut line. Implementation may
+proceed as a follow-on code task, but this does not approve enabling saved-route
+following or navigation in a V1 release. Decision D06 remains “view and follow
+saved routes; no route engine”; turn-by-turn and a full offline graph remain
+excluded. Record the P13 implementation and acceptance separately, and keep
+the feature outside V1 navigation until the release cut line is explicitly
+reviewed.
+
 ## Release channels
 
 1. **Developer/debug APK:** local and CI validation only; test data; not a public promise.
@@ -138,7 +170,7 @@ These dispositions close the P00 planning questions while retaining explicit rev
 - **Sequencing (D21): accept.** Move auth work to just before cloud backup/sync; local profile and recording do not wait for sign-in.
 - **Sync policy (D22): accept.** V1 cloud is backup-first; saved GPS tracks are immutable after save, while allowed metadata merges and deletes tombstone. Revisit only with demonstrated multi-device editing need.
 - **Target SDK baseline (D23): accept as a dated baseline.** Use API 36 for the initial scaffold and re-check current Google Play requirements before every release; it is not a permanent promise.
-- **AI transport (D24): accept.** Keep a server-side vendor-neutral gateway boundary; OpenAI may be an initial provider later, but no vendor key or direct provider call ships in the app.
+- **AI transport (D24): accept, provider selection updated 2026-11-19 by owner request.** Keep the server-side vendor-neutral gateway boundary; prefer OpenRouter free models and fall back to Gemini free tier. No vendor key or direct provider call ships in the app. ChatGPT account and plan use is deferred until the app is accepted into OpenAI's participating-app flow and has an approved client configuration.
 - **Continuous quality (D25): accept.** Apply the Definition of Done to every task, not only P19.
 
 Update the HTML decision register from Proposed to the dispositions above when the roadmap file is next edited; this companion document records the P00 baseline in the meantime.

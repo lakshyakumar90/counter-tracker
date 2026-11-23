@@ -42,6 +42,31 @@ class TrackingEngineTest {
     }
 
     @Test
+    fun recordingAcquisitionRejectsCachedAndUnmeasuredFixes() {
+        val now = 60_000L
+        val fresh = sample(now - 2_000L, 0.0, 0.0)
+        assertTrue(isFreshRecordingFix(fresh, now))
+        assertFalse(isFreshRecordingFix(fresh.copy(timestampEpochMillis = now - 30_000L), now))
+        assertFalse(isFreshRecordingFix(fresh.copy(accuracyMeters = null), now))
+    }
+
+    @Test
+    fun stationaryGpsDriftDoesNotAdvanceDistanceAnchor() {
+        val gate = TrackDistanceGate()
+        gate.reset(sample(time = 1_000, lat = 0.0, lon = 0.0))
+
+        for (second in 2..30) {
+            val driftedLongitude = if (second % 2 == 0) 0.00018 else -0.00018
+            val stationaryFix = sample(second * 1_000L, 0.0, driftedLongitude)
+                .copy(speedMetersPerSecond = 0.1f)
+            assertEquals(0.0, gate.add(stationaryFix), 0.0)
+        }
+
+        val walkingFix = sample(31_000, 0.0, 0.00006).copy(speedMetersPerSecond = 1.2f)
+        assertEquals(6.67, gate.add(walkingFix), 0.1)
+    }
+
+    @Test
     fun haversineProducesExpectedDistanceForKnownCoordinateDelta() {
         val meters = haversineMeters(0.0, 0.0, 0.0, 0.001)
         assertEquals(111.2, meters, 1.0)
